@@ -13,7 +13,7 @@ accordance with their respective licenses.
 ## 1. Traffic Sign Computer Vision Dataset — by PRASHANT
 
 
-**Source**: Roboflow Universe — traffic-sign-yh4bz [(Roboflow Dataset Page)](https://universe.roboflow.com/prashant-qp3sw/traffic-sign-cdfml-jqtlw)
+**Source**: Roboflow Universe — traffic-sign [(Roboflow Dataset Page)](https://universe.roboflow.com/prashant-qp3sw/traffic-sign-yh4bz)
 
 **Author**: PRASHANT [(Roboflow Author Page)](https://universe.roboflow.com/prashant-qp3sw)
 
@@ -24,7 +24,7 @@ accordance with their respective licenses.
 ## 2. Traffic Signs Computer Vision Model (v15) — by trafficqro
 
 
-**Source**: Roboflow Universe — traffic-signs-xjiby [(Roboflow Dataset Page)](https://universe.roboflow.com/trafficqro/traffic-signs-xjiby)
+**Source**: Roboflow Universe — traffic-signs [(Roboflow Dataset Page)](https://universe.roboflow.com/trafficqro/traffic-signs-xjiby)
 
 **Author**: trafficqro [(Roboflow Author Page)](https://universe.roboflow.com/trafficqro)
 
@@ -34,7 +34,7 @@ accordance with their respective licenses.
 ## 3. Road Sign Computer Vision Model (v3) — by Big Diggers
 
 
-**Source**: Roboflow Universe — road-sign-mcfu1 [(Roboflow Dataset Page)](https://universe.roboflow.com/big-diggers/road-sign-mcfu1)
+**Source**: Roboflow Universe — road-sign [(Roboflow Dataset Page)](https://universe.roboflow.com/big-diggers/road-sign-mcfu1)
 
 **Author**: Big Diggers [(Roboflow Author Page)](https://universe.roboflow.com/big-diggers)
 
