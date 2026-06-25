@@ -39,12 +39,12 @@ def find_csv_file(df: pd.DataFrame, archive: zipfile.ZipFile, file_list: list[st
         Cerca il primo file CSV all'interno di un archivio ZIP e lo legge in un DataFrame,
         caricandolo tramite pandas.
 
-        Args:
+        :param:
             df (pd.DataFrame): DataFrame di partenza (verrà sovrascritto con i dati del CSV trovato).
             archive (zipfile.ZipFile): L'oggetto archivio ZIP già aperto in modalità lettura.
             file_list (list[str]): La lista dei nomi dei file (o percorsi) presenti nell'archivio.
 
-        Returns:
+        :return:
             pd.DataFrame: Un nuovo DataFrame contenente i dati letti dal file CSV.
             Se non viene trovato alcun file CSV, restituisce il DataFrame `df` passato in input.
     """
@@ -60,7 +60,7 @@ def image_preprocessing_csv(zip_path: str, output_folder="pre-processed_images",
     """
         Estrae immagini da un archivio ZIP, le ritaglia in base ai bounding box.
 
-        Args:
+        :param:
             zip_path (str): Il percorso o il nome del file ZIP da esplorare (es. "Road_Sign.v3i.voc.zip").
             output_folder (str, opzionale): Il percorso della cartella in cui verranno salvate le immagini
                 ritagliate. Di default è "pre-processed_images".
@@ -68,7 +68,7 @@ def image_preprocessing_csv(zip_path: str, output_folder="pre-processed_images",
                 (se già esistente) e tutto il suo contenuto. Di default è False.
             max_iter (int, opzionale): Il numero massimo di file da processare (principalmente per il testing)
                 Se impostato ad un numero negativo, processa tutti i file. Di default è -1.
-        Returns:
+        :return:
             None: La funzione non restituisce alcun valore. Ha come side-effect la creazione di una cartella d'immagini.
     """
 
@@ -159,7 +159,7 @@ def image_preprocessing_xml(zip_path: str, output_folder="pre-processed_images",
         Estrae immagini da un archivio ZIP, le ritaglia in base ai bounding box definiti nei file XML
         (standard PASCAL VOC) e le salva in una cartella.
 
-        Args:
+        :param:
             zip_path (str): Il percorso o il nome del file ZIP da esplorare (es. "Road_Sign.v3i.voc.zip").
             output_folder (str, opzionale): Il percorso della cartella in cui verranno salvate le immagini
                 ritagliate. Di default è "pre-processed_images".
@@ -168,7 +168,7 @@ def image_preprocessing_xml(zip_path: str, output_folder="pre-processed_images",
             max_iter (int, opzionale): Il numero massimo di file da processare (principalmente per il testing)
                 Se impostato ad un numero negativo, processa tutti i file. Di default è -1.
 
-        Returns:
+        :return:
             None: La funzione non restituisce alcun valore. Ha come side-effect la creazione di una cartella d'immagini.
     """
 
@@ -267,3 +267,49 @@ def image_preprocessing_xml(zip_path: str, output_folder="pre-processed_images",
 
 #image_preprocessing_csv("rf1.tensorflow.zip")
 image_preprocessing_xml("k1.xml.zip")
+
+def view_csv(file_name: str) -> None:
+    """
+    Visualizza il csw tramite pandas
+    :param
+        file_name: nome del file
+    :return:
+        None: visualizza a schermo il dataset
+    """
+    try:
+        # Carica il dataset
+        df = pd.read_csv(file_name)
+
+        # --- CONFIGURAZIONI PER IL TERMINALE DI PYCHARM ---
+        # Forza Pandas a mostrare tutte le colonne senza i fastidiosi puntini di sospensione (...)
+        pd.set_option('display.max_columns', None)
+
+        # Allarga la larghezza massima del display per evitare che le righe vadano a capo
+        pd.set_option('display.width', 1000)
+
+        # (Opzionale) Mostra un numero maggiore di righe, ad esempio 50
+        pd.set_option('display.max_rows', 50)
+
+        # --- VISUALIZZAZIONE ---
+        print("\n--- ANTEPRIMA DEL DATASET ---")
+        # Stampa le prime 25 righe (puoi cambiare questo valore o rimuovere .head() per vedere tutto)
+        print(df)
+        #
+        print("\n--- INFORMAZIONI SUL DATASET ---")
+        print(f"Totale righe: {len(df)}")
+        lista_classi = df['class'].unique()
+        print(f"Classi uniche trovate: {lista_classi}")
+
+        # Numero di elementi per classe
+        i = 0
+        for classi in lista_classi:
+            i += len(df[(df["class"] == classi)])
+            print(classi + ": " + str(len(df[(df["class"] == classi)])))
+
+        # Totale
+        print(f"Totale: {len(df)} - Calcolati: {i}\n")
+
+    except FileNotFoundError:
+        print(f"Errore: Il file '{file_name}' non è stato trovato.")
+    except Exception as e:
+        print(f"Si è verificato un errore: {e}")
