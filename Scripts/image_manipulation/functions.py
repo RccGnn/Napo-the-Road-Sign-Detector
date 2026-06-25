@@ -110,9 +110,9 @@ def image_preprocessing_csv(zip_path: str, output_folder="pre-processed_images",
             if file_path.endswith("/"):
                 continue
 
-            # Trova tutti i file JPEG o JPG
+            # Trova tutti i file JPEG o JPG o PNG
             t = file_path.lower()
-            if t.endswith((".jpeg", ".jpg")):
+            if t.endswith((".jpeg", ".jpg", ".png")):
 
                 # Recupera tutte le righe relative ad un jpeg
                 res = df.query(f"filename == '{os.path.basename(file_path)}'")
@@ -187,7 +187,6 @@ def image_preprocessing_xml(zip_path: str, output_folder="pre-processed_images",
     # Crea la cartella dove mettere le immagini modificate, se non esiste
     os.makedirs(output_folder, exist_ok=True)
 
-
     # Esplora il file zip (come se fosse una cartella normale, evitando la decompressione)
     with (zipfile.ZipFile(zip_path, "r") as archive):
         file_list = archive.namelist()
@@ -205,16 +204,15 @@ def image_preprocessing_xml(zip_path: str, output_folder="pre-processed_images",
             if file_path.endswith("/"):
                 continue
 
-            # Trova tutti i file JPEG o JPG
+            # Trova tutti i file JPEG o JPG o PNG
             t = file_path.lower()
-            if t.endswith((".jpeg", ".jpg")):
+            if t.endswith((".jpeg", ".jpg", ".png")):
 
-                print(t)
                 # Separa la radice dall'estenzione
                 # i.e.: 'test/folder1/img.jpg' -> ('test/folder1/img', '.jpg')
                 base_path, _ = os.path.splitext(file_path)
                 xml_path = f"{base_path}.xml"
-
+                print(xml_path)
                 # Trova il relativo file XML per ogni immagine
                 if xml_path in file_list:
                     try:
@@ -266,50 +264,60 @@ def image_preprocessing_xml(zip_path: str, output_folder="pre-processed_images",
                     print(f"Warning: No matching XML found for {file_path}")
 
 #image_preprocessing_csv("rf1.tensorflow.zip")
-image_preprocessing_xml("k1.xml.zip")
+#image_preprocessing_xml("k1.xml.zip")
 
-def view_csv(file_name: str) -> None:
+def view_csv(zip_path: str) -> None:
     """
     Visualizza il csw tramite pandas
     :param
-        file_name: nome del file
+        zip_path: Nome del dataset zippato, cioè [nome_dataset.zip]
     :return:
         None: visualizza a schermo il dataset
     """
-    try:
-        # Carica il dataset
-        df = pd.read_csv(file_name)
+    # Risolve zip_path rispetto a Dataset/ e non rispetto alla cwd
+    zip_path = get_dataset_dir() / zip_path
 
-        # --- CONFIGURAZIONI PER IL TERMINALE DI PYCHARM ---
-        # Forza Pandas a mostrare tutte le colonne senza i fastidiosi puntini di sospensione (...)
-        pd.set_option('display.max_columns', None)
+    with (zipfile.ZipFile(zip_path, "r") as archive):
+        file_list = archive.namelist()
 
-        # Allarga la larghezza massima del display per evitare che le righe vadano a capo
-        pd.set_option('display.width', 1000)
+        # Recupera e apri il file .csv
+        df = pd.DataFrame
+        df = find_csv_file(df, archive, file_list)
 
-        # (Opzionale) Mostra un numero maggiore di righe, ad esempio 50
-        pd.set_option('display.max_rows', 50)
+        try:
 
-        # --- VISUALIZZAZIONE ---
-        print("\n--- ANTEPRIMA DEL DATASET ---")
-        # Stampa le prime 25 righe (puoi cambiare questo valore o rimuovere .head() per vedere tutto)
-        print(df)
-        #
-        print("\n--- INFORMAZIONI SUL DATASET ---")
-        print(f"Totale righe: {len(df)}")
-        lista_classi = df['class'].unique()
-        print(f"Classi uniche trovate: {lista_classi}")
+            # --- CONFIGURAZIONI PER IL TERMINALE ---
+            # Forza Pandas a mostrare tutte le colonne senza i fastidiosi puntini di sospensione (...)
+            pd.set_option('display.max_columns', None)
 
-        # Numero di elementi per classe
-        i = 0
-        for classi in lista_classi:
-            i += len(df[(df["class"] == classi)])
-            print(classi + ": " + str(len(df[(df["class"] == classi)])))
+            # Allarga la larghezza massima del display per evitare che le righe vadano a capo
+            pd.set_option('display.width', 1000)
 
-        # Totale
-        print(f"Totale: {len(df)} - Calcolati: {i}\n")
+            # (Opzionale) Mostra un numero maggiore di righe, ad esempio 50
+            pd.set_option('display.max_rows', 50)
 
-    except FileNotFoundError:
-        print(f"Errore: Il file '{file_name}' non è stato trovato.")
-    except Exception as e:
-        print(f"Si è verificato un errore: {e}")
+            # --- VISUALIZZAZIONE ---
+            print("\n--- ANTEPRIMA DEL DATASET ---")
+            # Stampa le prime 25 righe (puoi cambiare questo valore o rimuovere .head() per vedere tutto)
+            print(df)
+            #
+            print("\n--- INFORMAZIONI SUL DATASET ---")
+            print(f"Totale righe: {len(df)}")
+            lista_classi = df['class'].unique()
+            print(f"Classi uniche trovate: {lista_classi}")
+
+            # Numero di elementi per classe
+            i = 0
+            for classi in lista_classi:
+                i += len(df[(df["class"] == classi)])
+                print(classi + ": " + str(len(df[(df["class"] == classi)])))
+
+            # Totale
+            print(f"Totale: {len(df)} - Calcolati: {i}\n")
+
+        except FileNotFoundError:
+            print(f"Errore: Il file '{zip_path}' non è stato trovato.")
+        except Exception as e:
+            print(f"Si è verificato un errore: {e}")
+
+view_csv("rf1.tensorflow.zip")
