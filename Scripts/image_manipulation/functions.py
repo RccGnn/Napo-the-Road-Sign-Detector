@@ -50,7 +50,8 @@ def find_csv_file(df: pd.DataFrame, archive: zipfile.ZipFile, file_list: list[st
     """
     for file_path in file_list:
         # Restituisce solo il secondo valore, l'estensione
-        if os.path.splitext(file_path)[1] == ".csv":
+        parts = pathlib.Path(file_path).parts  # ('root', 'train', 'data.csv')
+        if "train" in parts and os.path.splitext(file_path)[1] == ".csv":
             df = pd.read_csv(archive.open(file_path))
             break
     return df
