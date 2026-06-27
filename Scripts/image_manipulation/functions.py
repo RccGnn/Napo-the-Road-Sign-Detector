@@ -20,6 +20,9 @@ def get_dataset_dir() -> pathlib.Path:
             Scripts/
                 image_manipulation/
                     functions.py    <<<
+
+    Returns:
+        pathlib.Path: il path delle cartella Dataset.
     """
     # __file__ è il path assoluto dello script in esecuzione
     this_file = pathlib.Path(__file__).resolve()
@@ -31,6 +34,7 @@ def get_dataset_dir() -> pathlib.Path:
         if dataset_dir.is_dir():
             return dataset_dir
 
+    # Lancia errore
     raise FileNotFoundError("Cartella 'Dataset' non trovata.")
 
 
@@ -39,12 +43,12 @@ def find_csv_file(df: pd.DataFrame, archive: zipfile.ZipFile, file_list: list[st
         Cerca il primo file CSV all'interno di un archivio ZIP e lo legge in un DataFrame,
         caricandolo tramite pandas.
 
-        :param:
+        Args:
             df (pd.DataFrame): DataFrame di partenza (verrà sovrascritto con i dati del CSV trovato).
             archive (zipfile.ZipFile): L'oggetto archivio ZIP già aperto in modalità lettura.
             file_list (list[str]): La lista dei nomi dei file (o percorsi) presenti nell'archivio.
 
-        :return:
+        Returns:
             pd.DataFrame: Un nuovo DataFrame contenente i dati letti dal file CSV.
             Se non viene trovato alcun file CSV, restituisce il DataFrame `df` passato in input.
     """
@@ -57,20 +61,104 @@ def find_csv_file(df: pd.DataFrame, archive: zipfile.ZipFile, file_list: list[st
     return df
 
 
+def xml_to_csv(archive: zipfile.ZipFile, output_csv="annotations.csv") -> pd.DataFrame:
+    """
+    Legge tutti i file XML (PASCAL VOC) dalla cartella 'annotations/'
+    di un archivio ZIP e produce un CSV compatibile con image_preprocessing_csv().
+
+    Struttura ZIP attesa:
+        annotations/road0.xml
+        annotations/road1.xml
+        images/road0.png
+        images/road1.png
+
+    Args:
+        zip_path: Nome del file ZIP (es. "dataset.zip"), cercato in Dataset/
+        output_csv: Nome del CSV di output, salvato in Dataset/
+
+    Returns:
+        pd.DataFrame: Come effetto collaterale viene creato un file .csv nella cartella /Dataset
+    """
+
+    # Ottieni il percorso assoluto della cartella Dataset e la concateno al file .csv
+    resolved_csv = get_dataset_dir() / output_csv
+
+    rows = []
+
+    file_list = archive.namelist()
+
+    # Per ogni file trovato nell'archivio, aggiungi solo gli xml
+    xml_files = [
+        f for f in file_list #Per ogni file f nella lista
+        # Solo file .xml nella cartella "_annotation"
+        if "annotations" in pathlib.Path(f).parts and f.lower().endswith(".xml")
+    ]
+
+    print(f"Trovati {len(xml_files)} file XML.")
+
+    for xml_path in xml_files:
+        try:
+            # Ottieni la radice del file xml
+            with archive.open(xml_path) as xml_file:
+                tree = Et.parse(xml_file)
+                root = tree.getroot()
+
+            # Ottieni il tag <filename>
+            # i.e. annotations/road0.xml  →  road0
+            filename_tag = root.find("filename")
+            if filename_tag is not None and filename_tag.text.strip():
+                filename = filename_tag.text.strip()
+            else:
+                # Ricava il nome dell'immagine dal nome del file XML: "annotations/road0.xml" → "road0.png"
+                stem = pathlib.Path(xml_path).stem   # "road0"
+                filename = stem + ".png"
+                print(f"Warning: Nessun file di nome: <filename> tag in {xml_path}, inferred '{filename}'")
+
+            # Nel tag object di xml è conservato il nome della classe a cui appartiene l'oggetto e il boundbox
+            for obj in root.findall("object"):
+                class_tag = obj.find("name")
+                class_name = class_tag.text.strip() if class_tag is not None else ""
+
+                bndbox = obj.find("bndbox")
+                if bndbox is None:
+                    continue
+
+                # Aggiungi alla riga del csv le informazioni ricavate
+                rows.append({
+                    "filename": filename,
+                    "class":    class_name,
+                    "xmin":     int(float(bndbox.find("xmin").text)),
+                    "ymin":     int(float(bndbox.find("ymin").text)),
+                    "xmax":     int(float(bndbox.find("xmax").text)),
+                    "ymax":     int(float(bndbox.find("ymax").text)),
+                })
+
+        except Exception as e:
+            print(f"Errore - {xml_path}: {e}")
+
+    # Imposta le colonne del csv
+    df = pd.DataFrame(rows, columns=["filename", "class", "xmin", "ymin", "xmax", "ymax"])
+    df.to_csv(resolved_csv, index=False)
+    print(f"✅ - Trovati {len(rows)} bounding boxes da  {len(xml_files)} file XML → '{resolved_csv}'")
+    return df
+
+
 def image_preprocessing_csv(zip_path: str, output_folder="pre-processed_images", delete_previous=False, max_iter=-1, xml_mode=False) -> None:
     """
         Estrae immagini da un archivio ZIP, le ritaglia in base ai bounding box.
 
-        :param zip_path: Il percorso o il nome del file ZIP da esplorare (es. "Road_Sign.v3i.voc.zip").
-        :param output_folder: Il percorso della cartella in cui verranno salvate le immagini
+        Args:
+            zip_path: Il percorso o il nome del file ZIP da esplorare (es. "Road_Sign.v3i.voc.zip").
+            output_folder: Il percorso della cartella in cui verranno salvate le immagini
                 ritagliate. Di default è "pre-processed_images".
-        :param delete_previous: Se impostato a True, elimina la cartella `output_folder`
+            delete_previous: Se impostato a True, elimina la cartella `output_folder`
                 (se già esistente) e tutto il suo contenuto. Di default è False.
-        :param max_iter: Il numero massimo di file da processare (principalmente per il testing)
+            max_iter: Il numero massimo di file da processare (principalmente per il testing)
                 Se impostato ad un numero negativo, processa tutti i file. Di default è -1.
-        :param xml_mode: Permette, se impostato a vero, di creare un file .csv partendo da una serie di file xml.
+            xml_mode: Permette, se impostato a vero, di creare un file .csv partendo da una serie di file xml.
                 Di default False.
-        :return: None: La funzione non restituisce alcun valore. Ha come side-effect la creazione di una cartella d'immagini.
+        Returns:
+            None: La funzione non restituisce alcun valore. Ha come side-effect la creazione di una cartella d'immagini.
     """
 
     # Risolve zip_path rispetto a Dataset/ e non rispetto alla cwd
@@ -157,7 +245,7 @@ def image_preprocessing_csv(zip_path: str, output_folder="pre-processed_images",
                                 output_folder, new_filename
                             )
 
-                            # JPEG non supporta il canale alpha (RGBA) → converti in RGB
+                            # JPEG non supporta il canale alpha (RGBA), convertire in RGB
                             if cropped_img.mode == "RGBA":
                                 cropped_img = cropped_img.convert("RGB")
 
@@ -179,8 +267,10 @@ import xml.etree.ElementTree as Et
 def view_csv(zip_path: str) -> None:
     """
     Visualizza il csw tramite pandas
-    :param zip_path: Nome del dataset zippato, cioè [nome_dataset.zip]
-    :return: None: visualizza a schermo il dataset
+    Args:
+        zip_path: Nome del dataset zippato, cioè [nome_dataset.zip]
+    Returns:
+        None: visualizza a schermo il dataset
     """
     # Risolve zip_path rispetto a Dataset/ e non rispetto alla cwd
     zip_path = get_dataset_dir() / zip_path
@@ -195,7 +285,7 @@ def view_csv(zip_path: str) -> None:
         try:
 
             # --- CONFIGURAZIONI PER IL TERMINALE ---
-            # Forza Pandas a mostrare tutte le colonne senza i fastidiosi puntini di sospensione (...)
+            # Forza Pandas a mostrare tutte le colonne senza punti di sospensione (...)
             pd.set_option('display.max_columns', None)
 
             # Allarga la larghezza massima del display per evitare che le righe vadano a capo
@@ -206,9 +296,8 @@ def view_csv(zip_path: str) -> None:
 
             # --- VISUALIZZAZIONE ---
             print("\n--- ANTEPRIMA DEL DATASET ---")
-            # Stampa le prime 25 righe (puoi cambiare questo valore o rimuovere .head() per vedere tutto)
             print(df)
-            #
+
             print("\n--- INFORMAZIONI SUL DATASET ---")
             print(f"Totale righe: {len(df)}")
             lista_classi = df['class'].unique()
@@ -216,12 +305,13 @@ def view_csv(zip_path: str) -> None:
 
             # Numero di elementi per classe
             i = 0
+            print("\n--- INFORMAZIONI SUGLI ELEMENTI DEL DATASET ---")
             for classi in lista_classi:
                 i += len(df[(df["class"] == classi)])
                 print(classi + ": " + str(len(df[(df["class"] == classi)])))
 
-            # Totale
-            print(f"Totale: {len(df)} - Calcolati: {i}\n")
+            # Totale vs effettivamente contati
+            print(f"Totale: {len(df)}\nContati: {i}\n")
 
         except FileNotFoundError:
             print(f"Errore: Il file '{zip_path}' non è stato trovato.")
@@ -229,78 +319,5 @@ def view_csv(zip_path: str) -> None:
             print(f"Si è verificato un errore: {e}")
 
 #view_csv("rf1.tensorflow.zip")
-
-def xml_to_csv(archive: zipfile.ZipFile, output_csv="annotations.csv") -> pd.DataFrame:
-    """
-    Legge tutti i file XML (PASCAL VOC) dalla cartella 'annotations/'
-    di un archivio ZIP e produce un CSV compatibile con image_preprocessing_csv().
-
-    Struttura ZIP attesa:
-        annotations/road0.xml
-        annotations/road1.xml
-        images/road0.png
-        images/road1.png
-
-    :param zip_path:   Nome del file ZIP (es. "dataset.zip"), cercato in Dataset/
-    :param output_csv: Nome del CSV di output, salvato in Dataset/
-
-    :return:    pd.DataFrame: Come effetto collaterale viene creato un file .csv nella cartella /Dataset
-    """
-
-    resolved_csv = get_dataset_dir() / output_csv
-
-    rows = []
-
-    file_list = archive.namelist()
-
-    xml_files = [
-        f for f in file_list
-        if "annotations" in pathlib.Path(f).parts  # only annotations/ folder
-        and f.lower().endswith(".xml")
-    ]
-
-    print(f"Found {len(xml_files)} XML files.")
-
-    for xml_path in xml_files:
-        try:
-            with archive.open(xml_path) as xml_file:
-                tree = Et.parse(xml_file)
-                root = tree.getroot()
-
-            # Try <filename> tag first, fall back to the XML filename itself
-            # e.g. annotations/road0.xml  →  road0
-            filename_tag = root.find("filename")
-            if filename_tag is not None and filename_tag.text.strip():
-                filename = filename_tag.text.strip()
-            else:
-                # Derive from the XML name: "annotations/road0.xml" → "road0.png"
-                stem = pathlib.Path(xml_path).stem   # "road0"
-                filename = stem + ".png"
-                print(f"Warning: no <filename> tag in {xml_path}, inferred '{filename}'")
-
-            for obj in root.findall("object"):
-                class_tag = obj.find("name")
-                class_name = class_tag.text.strip() if class_tag is not None else ""
-
-                bndbox = obj.find("bndbox")
-                if bndbox is None:
-                    continue
-
-                rows.append({
-                    "filename": filename,
-                    "class":    class_name,
-                    "xmin":     int(float(bndbox.find("xmin").text)),
-                    "ymin":     int(float(bndbox.find("ymin").text)),
-                    "xmax":     int(float(bndbox.find("xmax").text)),
-                    "ymax":     int(float(bndbox.find("ymax").text)),
-                })
-
-        except Exception as e:
-            print(f"Error processing {xml_path}: {e}")
-
-    df = pd.DataFrame(rows, columns=["filename", "class", "xmin", "ymin", "xmax", "ymax"])
-    df.to_csv(resolved_csv, index=False)
-    print(f"✅ Done. {len(rows)} bounding boxes from {len(xml_files)} XML files → '{resolved_csv}'")
-    return df
 
 image_preprocessing_csv("k1.xml.zip", xml_mode=True)
