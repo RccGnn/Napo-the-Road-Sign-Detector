@@ -273,50 +273,41 @@ def view_csv(zip_path: str) -> None:
         None: visualizza a schermo il dataset
     """
     # Risolve zip_path rispetto a Dataset/ e non rispetto alla cwd
-    zip_path = get_dataset_dir() / zip_path
+    resolved = get_dataset_dir() / zip_path
 
-    with (zipfile.ZipFile(zip_path, "r") as archive):
-        file_list = archive.namelist()
+    if resolved.suffix == ".csv":
+        df = pd.read_csv(resolved)
+    else:
+        with zipfile.ZipFile(resolved, "r") as archive:
+            file_list = archive.namelist()
+            df = pd.DataFrame()
+            df = find_csv_file(df, archive, file_list)
 
-        # Recupera e apri il file .csv
-        df = pd.DataFrame
-        df = find_csv_file(df, archive, file_list)
+    # ← Il try ora è FUORI da if/else, viene sempre eseguito
+    try:
+        pd.set_option('display.max_columns', None)
+        pd.set_option('display.width', 1000)
+        pd.set_option('display.max_rows', 50)
 
-        try:
+        print("\n--- ANTEPRIMA DEL DATASET ---")
+        print(df)
 
-            # --- CONFIGURAZIONI PER IL TERMINALE ---
-            # Forza Pandas a mostrare tutte le colonne senza punti di sospensione (...)
-            pd.set_option('display.max_columns', None)
+        print("\n--- INFORMAZIONI SUL DATASET ---")
+        print(f"Totale righe: {len(df)}")
+        lista_classi = df['class'].unique()
+        print(f"Classi uniche trovate: {lista_classi}")
 
-            # Allarga la larghezza massima del display per evitare che le righe vadano a capo
-            pd.set_option('display.width', 1000)
+        i = 0
+        for classi in lista_classi:
+            i += len(df[(df["class"] == classi)])
+            print(classi + ": " + str(len(df[(df["class"] == classi)])))
 
-            # (Opzionale) Mostra un numero maggiore di righe, ad esempio 50
-            pd.set_option('display.max_rows', 50)
+        print(f"Totale: {len(df)} - Calcolati: {i}\n")
 
-            # --- VISUALIZZAZIONE ---
-            print("\n--- ANTEPRIMA DEL DATASET ---")
-            print(df)
-
-            print("\n--- INFORMAZIONI SUL DATASET ---")
-            print(f"Totale righe: {len(df)}")
-            lista_classi = df['class'].unique()
-            print(f"Classi uniche trovate: {lista_classi}")
-
-            # Numero di elementi per classe
-            i = 0
-            print("\n--- INFORMAZIONI SUGLI ELEMENTI DEL DATASET ---")
-            for classi in lista_classi:
-                i += len(df[(df["class"] == classi)])
-                print(classi + ": " + str(len(df[(df["class"] == classi)])))
-
-            # Totale vs effettivamente contati
-            print(f"Totale: {len(df)}\nContati: {i}\n")
-
-        except FileNotFoundError:
-            print(f"Errore: Il file '{zip_path}' non è stato trovato.")
-        except Exception as e:
-            print(f"Si è verificato un errore: {e}")
+    except FileNotFoundError:
+        print(f"Errore: Il file '{zip_path}' non è stato trovato.")
+    except Exception as e:
+        print(f"Si è verificato un errore: {e}")
 
 #view_csv("rf1.tensorflow.zip")
 
