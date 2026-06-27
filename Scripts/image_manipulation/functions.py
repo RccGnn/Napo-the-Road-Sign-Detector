@@ -73,7 +73,7 @@ def xml_to_csv(archive: zipfile.ZipFile, output_csv="annotations.csv") -> pd.Dat
         images/road1.png
 
     Args:
-        zip_path: Nome del file ZIP (es. "dataset.zip"), cercato in Dataset/
+        archive: file ZIP (es. "dataset.zip"), cercato in Dataset/
         output_csv: Nome del CSV di output, salvato in Dataset/
 
     Returns:
@@ -226,34 +226,19 @@ def image_preprocessing_csv(zip_path: str, output_folder="pre-processed_images",
                         ymax = int(row["ymax"])
 
                         # Leggi l'immagine
+
                         with archive.open(file_path) as img_file:
                             img_data = io.BytesIO(img_file.read())
-                            img = Image.open(img_data)
+                            base_name = os.path.splitext(os.path.basename(file_path))[0]
 
-                            # Come splitext ma si prende anche il nome del file, non solo l'estensione
-                            base_name = os.path.basename(file_path)
-
-                            # Taglia l'immagine
-                            cropped_img = img.crop(
-                                (xmin, ymin, xmax, ymax)
-                            )
-                            # Salva nella cartella predefinita
-                            new_filename = (
-                                f"{base_name}_cropped_{index}.jpeg"
-                            )
-                            save_path = os.path.join(
-                                output_folder, new_filename
-                            )
-
-                            # JPEG non supporta il canale alpha (RGBA), convertire in RGB
-                            if cropped_img.mode == "RGBA":
-                                cropped_img = cropped_img.convert("RGB")
-
-                            cropped_img.save(save_path)
-                            print(f"Saved: {save_path}")
-
-                            img.close()
-
+                            with Image.open(img_data) as img:
+                                # Taglia l'immagine
+                                cropped_img = img.crop((xmin, ymin, xmax, ymax))
+                                # Salva l'immagine
+                                new_filename = f"{base_name}cropped{index}.png"
+                                save_path = os.path.join(output_folder, new_filename)
+                                cropped_img.save(save_path)
+                                print(f"Saved: {save_path}")
 
 import xml.etree.ElementTree as Et
 
@@ -311,4 +296,4 @@ def view_csv(zip_path: str) -> None:
 
 #view_csv("rf1.tensorflow.zip")
 
-image_preprocessing_csv("k1.xml.zip", xml_mode=True)
+image_preprocessing_csv("rf1.tensorflow.zip", xml_mode=False)
