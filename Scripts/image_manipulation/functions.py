@@ -230,6 +230,7 @@ def image_preprocessing_csv(zip_path: str, output_folder="pre-processed_images",
                         with archive.open(file_path) as img_file:
                             img_data = io.BytesIO(img_file.read())
                             base_name = os.path.splitext(os.path.basename(file_path))[0]
+                            base_name= base_name[:50]
 
                             with Image.open(img_data) as img:
                                 # Taglia l'immagine
@@ -279,21 +280,24 @@ def view_csv(zip_path: str) -> None:
 
         print("\n--- INFORMAZIONI SUL DATASET ---")
         print(f"Totale righe: {len(df)}")
-        lista_classi = df['class'].unique()
-        print(f"Classi uniche trovate: {lista_classi}")
 
-        i = 0
-        for classi in lista_classi:
-            i += len(df[(df["class"] == classi)])
-            print(classi + ": " + str(len(df[(df["class"] == classi)])))
 
-        print(f"Totale: {len(df)} - Calcolati: {i}\n")
+        print(f"Righe con class NaN: {df['class'].isna().sum()}")
+
+        conteggio = df['class'].value_counts(dropna=False)
+        print(f"Classi uniche trovate: {conteggio.index.tolist()}")
+
+        for classe, count in conteggio.items():
+            print(f"{classe}: {count}")
+
+        print(f"Totale: {len(df)} - Calcolati: {conteggio.sum()}\n")
+
 
     except FileNotFoundError:
         print(f"Errore: Il file '{zip_path}' non è stato trovato.")
     except Exception as e:
         print(f"Si è verificato un errore: {e}")
 
-#view_csv("rf1.tensorflow.zip")
+view_csv("rf1.tensorflow.zip")
 
 image_preprocessing_csv("rf1.tensorflow.zip", xml_mode=False)
