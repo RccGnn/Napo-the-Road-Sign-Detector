@@ -11,6 +11,9 @@ import pathlib
 import zipfile
 from PIL import Image
 
+# Variabile GLOBALE
+csv_list = []
+
 def get_dataset_dir() -> pathlib.Path:
     """
     Restituisce il percorso assoluto di un file nella cartella Dataset.
@@ -29,39 +32,50 @@ def get_dataset_dir() -> pathlib.Path:
 
     # Risali le cartelle per costruire il path della cartella 'Dataset'
     for parent in this_file.parents:
-        # '/' operatore di concatenazione
+        # Verifica se /Dataset è una cartella nel path
         dataset_dir = parent / "Dataset"
-        if dataset_dir.is_dir():
+        if os.path.isdir(dataset_dir):
             return dataset_dir
 
     # Lancia errore
     raise FileNotFoundError("Cartella 'Dataset' non trovata.")
 
-
-def find_csv_file(csv_list: list[pd.DataFrame], archive: zipfile.ZipFile) -> list[pd.DataFrame]:
+def find_csv_files() -> None:
     """
         Cerca il primo file CSV all'interno di un archivio ZIP e lo legge in un DataFrame,
         caricandolo tramite pandas.
 
-        Args:
-            csv_list: lista di DataFrame.
-            archive (zipfile.ZipFile): L'oggetto archivio ZIP già aperto in modalità lettura.
-
         Returns:
-            pd.DataFrame: Un nuovo DataFrame contenente i dati letti dal file CSV.
-            Se non viene trovato alcun file CSV, restituisce il DataFrame `df` passato in input.
+            None: Come effetto collaterale vengono aggiunti nella lista globale csv_list i
+            DataFrame contenente i dati letti dal file CSV.
     """
-    count = 3
-    file_list = archive.namelist()
-    for file_path in file_list:
-        if count > 0 and os.path.splitext(file_path)[1] == ".csv":
-            df = pd.read_csv(archive.open(file_path))
-            csv_list.append(df)
-            count -= 1
-    return csv_list
+
+    # Recupera il percorso della cartella Dataset e trasformalo in assoluto (con .resolve)
+    dataset_path = get_dataset_dir().resolve()
+    global csv_list
+
+    # Usa .glob("*.zip") per ciclare solo sui file con estensione .zip
+    for zip_path in dataset_path.glob("*.zip"):
+
+        # Esplora il file zip (come se fosse una cartella normale, evitando la decompressione)
+        with (zipfile.ZipFile(zip_path, "r") as archive):
+
+            if "xml" in str(zip_path):
+                # Per gli archivi di dataset che hanno annotazioni sottoforma di XML pascal
+                xml_to_csv(archive)
+
+            file_list = archive.namelist()
+            for file_path in file_list:
+
+                # Scegli solo i file in train
+                root, ext = os.path.splitext(file_path)
+                if ext == ".csv" and "train" in root:
+                    df = pd.read_csv(archive.open(file_path))
+                    csv_list.append(df)
+                    break
 
 
-def xml_to_csv(archive: zipfile.ZipFile, output_csv="annotations.csv") -> pd.DataFrame:
+def xml_to_csv(archive: zipfile.ZipFile, output_csv="annotations.csv") -> None:
     """
     Legge tutti i file XML (PASCAL VOC) dalla cartella 'annotations/'
     di un archivio ZIP e produce un CSV compatibile con image_preprocessing_csv().
@@ -75,16 +89,14 @@ def xml_to_csv(archive: zipfile.ZipFile, output_csv="annotations.csv") -> pd.Dat
     Args:
         archive: file ZIP (es. "dataset.zip"), cercato in Dataset/
         output_csv: Nome del CSV di output, salvato in Dataset/
-
     Returns:
-        pd.DataFrame: Come effetto collaterale viene creato un file .csv nella cartella /Dataset
+        None: Come effetto collaterale viene creato un file .csv nella cartella /Dataset
     """
 
-    # Ottieni il percorso assoluto della cartella Dataset e la concateno al file .csv
+    # Crea un file .csv con il nella cartella Dataset con il nome output_csv
     resolved_csv = get_dataset_dir() / output_csv
 
     rows = []
-
     file_list = archive.namelist()
 
     # Per ogni file trovato nell'archivio, aggiungi solo gli xml
@@ -95,6 +107,7 @@ def xml_to_csv(archive: zipfile.ZipFile, output_csv="annotations.csv") -> pd.Dat
     ]
 
     print(f"Trovati {len(xml_files)} file XML.")
+    global csv_list
 
     for xml_path in xml_files:
         try:
@@ -104,7 +117,7 @@ def xml_to_csv(archive: zipfile.ZipFile, output_csv="annotations.csv") -> pd.Dat
                 root = tree.getroot()
 
             # Ottieni il tag <filename>
-            # i.e. annotations/road0.xml  →  road0
+            # i.e. annotations/road0.xml → road0
             filename_tag = root.find("filename")
             if filename_tag is not None and filename_tag.text.strip():
                 filename = filename_tag.text.strip()
@@ -140,115 +153,118 @@ def xml_to_csv(archive: zipfile.ZipFile, output_csv="annotations.csv") -> pd.Dat
     df = pd.DataFrame(rows, columns=["filename", "class", "xmin", "ymin", "xmax", "ymax"])
     df.to_csv(resolved_csv, index=False)
     print(f"✅ - Trovati {len(rows)} bounding boxes da {len(xml_files)} file XML → '{resolved_csv}'")
-    return df
+    csv_list.append(df)
 
 
-def image_preprocessing_csv(zip_path: str, output_folder="pre-processed_images", delete_previous=False, max_iter=-1, xml_mode=False) -> None:
+def image_preprocessing_csv(output_folder="pre-processed_images", delete_previous=False, max_iter=-1) -> None:
     """
         Estrae immagini da un archivio ZIP, le ritaglia in base ai bounding box.
 
         Args:
-            zip_path: Il percorso o il nome del file ZIP da esplorare (es. "Road_Sign.v3i.voc.zip").
             output_folder: Il percorso della cartella in cui verranno salvate le immagini
                 ritagliate. Di default è "pre-processed_images".
             delete_previous: Se impostato a True, elimina la cartella `output_folder`
                 (se già esistente) e tutto il suo contenuto. Di default è False.
             max_iter: Il numero massimo di file da processare (principalmente per il testing)
                 Se impostato ad un numero negativo, processa tutti i file. Di default è -1.
-            xml_mode: Permette, se impostato a vero, di creare un file .csv partendo da una serie di file xml.
-                Di default False.
         Returns:
             None: La funzione non restituisce alcun valore. Ha come side-effect la creazione di una cartella d'immagini.
     """
 
-    # Risolve zip_path rispetto a Dataset/ e non rispetto alla cwd
-    zip_path = get_dataset_dir() / zip_path
+    # Recupera il percorso della cartella Dataset e trasformalo in assoluto (con .resolve)
+    dataset_path = get_dataset_dir().resolve()
 
-    # Risolve anche output_folder rispetto a Dataset/ e non rispetto alla cwd
+    # Recupera anche output_folder rispetto a Dataset/ e non rispetto alla cwd
     output_folder = get_dataset_dir() / output_folder
 
-    # Elimina la cartella di nome output_folder se esiste
+    # Elimina la cartella di nome output_folder se esiste e se 'delete_previous' = True
     if os.path.exists(output_folder) and delete_previous:
         # shutil = os.rmdir ma elimina anche gli elementi della cartella
         shutil.rmtree(output_folder)
-        print(f"🧹 Wiped old '{output_folder}' folder.")
+        print(f"🧹 Eliminato la cartella: '{output_folder}'.")
 
     # Crea la cartella dove mettere le immagini modificate, se non esiste
     os.makedirs(output_folder, exist_ok=True)
 
-    # Esplora il file zip (come se fosse una cartella normale, evitando la decompressione)
-    with (zipfile.ZipFile(zip_path, "r") as archive):
-        file_list = archive.namelist()
+    # Salva e apri i file .csv di tutti i dataset, PRIMA di iniziare ad iterare sui dataset
+    global csv_list
+    find_csv_files()
 
-        # Recupera e apri il file .csv
-        dataframes = []
-        if not xml_mode:
-            dataframes = find_csv_file(dataframes, archive)
-        else:
-            dataframes.append(xml_to_csv(archive))
+    # Se non sono stati trovati csv, termina
+    if len(csv_list) == 0:
+        print("Warning: nessun file csv trovato.")
 
-        # Se non sono stati trovati csv, termina
-        if len(dataframes) == 0:
-            print("Warning: nessun file csv trovato.")
+    # Se ogni csv letto è vuoto, termina
+    flag = False
+    for df in csv_list:
+        if not df.empty:
+            flag = True
+            break
+    if not flag:
+        print("Warning: nessuna annotazione trovata.")
+        return
 
-        # Se ogni csv letto è vuoto, termina
-        flag = False
-        for df in dataframes:
-            if not df.empty:
-                flag = True
-                break
-        if not flag:
-            print("Warning: nessuna annotazione trovata.")
-            return
+    counter = 0
+    # Usa .glob("*.zip") per ciclare solo sui file con estensione .zip
+    for zip_path in dataset_path.glob("*.zip"):
 
-        # File_path comprende tutti i file, anche cartelle o csv
-        for file_path in file_list:
+        # Esplora il file zip (come se fosse una cartella normale, evitando la decompressione)
+        with (zipfile.ZipFile(zip_path, "r") as archive):
+            file_list = archive.namelist()
 
-            # Interrompi le iterazioni se max_iter è un numero non negativo
-            # Evita questo controllo solo so max_iter è un numero negativo
-            if max_iter >= 0:
-                if max_iter == 0:
-                    return
-                max_iter -= 1
+            # File_path comprende tutti i file, anche cartelle o csv
+            for file_path in file_list:
 
-            # Scarta le cartelle (terminano con '/')
-            if file_path.endswith("/"):
-                continue
-
-            # Trova tutti i file JPEG o JPG o PNG
-            t = file_path.lower()
-            if t.endswith((".jpeg", ".jpg", ".png")):
-
-                # Recupera tutte le righe relative ad un jpeg
-                for df in dataframes:
-                    res = df.query(f"filename == '{os.path.basename(file_path)}'")
-                    if not res.empty:
+                # Interrompi le iterazioni se max_iter è un numero non negativo
+                # Evita questo controllo solo so max_iter è un numero negativo
+                if max_iter >= 0:
+                    if max_iter == 0:
                         break
+                    max_iter -= 1
 
-                if not res.empty:
-                    # Itera su tutte le righe trovate per quella specifica immagine
-                    for index, row in res.iterrows():
-                        # Estrai i valori direttamente del bounding box
-                        xmin = int(row["xmin"])
-                        ymin = int(row["ymin"])
-                        xmax = int(row["xmax"])
-                        ymax = int(row["ymax"])
+                # Trova tutti i file JPEG o JPG o PNG
+                t = file_path.lower()
 
-                        # Leggi l'immagine
+                if t.endswith((".jpeg", ".jpg", ".png")):
 
-                        with archive.open(file_path) as img_file:
-                            img_data = io.BytesIO(img_file.read())
-                            base_name = os.path.splitext(os.path.basename(file_path))[0]
-                            base_name= base_name[:50]
+                    # Recupera tutte le righe relative ad un jpeg
+                    for df in csv_list:
+                        res = df.query(f"filename == '{os.path.basename(file_path)}'")
+                        if not res.empty:
+                            break
 
-                            with Image.open(img_data) as img:
-                                # Taglia l'immagine
-                                cropped_img = img.crop((xmin, ymin, xmax, ymax))
-                                # Salva l'immagine
-                                new_filename = f"{base_name}cropped{index}.png"
-                                save_path = os.path.join(output_folder, new_filename)
-                                cropped_img.save(save_path)
-                                print(f"Saved: {save_path}")
+                    if not res.empty:
+                        # Itera su tutte le righe trovate per quella specifica immagine
+                        for index, row in res.iterrows():
+                            # Estrai i valori direttamente del bounding box
+                            xmin = int(row["xmin"])
+                            ymin = int(row["ymin"])
+                            xmax = int(row["xmax"])
+                            ymax = int(row["ymax"])
+
+                            # Leggi l'immagine
+                            with archive.open(file_path) as img_file:
+                                img_data = io.BytesIO(img_file.read())
+                                base_name = os.path.splitext(os.path.basename(file_path))[0]
+                                base_name= base_name[:50]
+
+                                with Image.open(img_data) as img:
+                                    # Taglia l'immagine
+                                    cropped_img = img.crop((xmin, ymin, xmax, ymax))
+                                    # Salva l'immagine
+                                    new_filename = f"{base_name}cropped{index}.png"
+                                    save_path = os.path.join(output_folder, new_filename)
+                                    cropped_img.save(save_path)
+                                    print(f"Salvato: {save_path}")
+                                    counter += 1
+
+    if counter < 5000 :
+        print(f"Salvate {counter} immagini! 😨")
+    elif 5000 <= counter < 10000:
+        print(f"Salvate {counter} immagini! 😰")
+    else:
+        print(f"Salvate {counter} immagini! 😱")
+
 
 import xml.etree.ElementTree as Et
 def view_csv(zip_path: str) -> None:
@@ -268,7 +284,7 @@ def view_csv(zip_path: str) -> None:
         with zipfile.ZipFile(resolved, "r") as archive:
             file_list = archive.namelist()
             df = pd.DataFrame()
-            df = find_csv_file(df, archive, file_list)
+            df = find_csv_files(df, archive, file_list)
 
     # ← Il try ora è FUORI da if/else, viene sempre eseguito
     try:
@@ -282,7 +298,6 @@ def view_csv(zip_path: str) -> None:
         print("\n--- INFORMAZIONI SUL DATASET ---")
         print(f"Totale righe: {len(df)}")
 
-
         print(f"Righe con class NaN: {df['class'].isna().sum()}")
 
         conteggio = df['class'].value_counts(dropna=False)
@@ -293,11 +308,10 @@ def view_csv(zip_path: str) -> None:
 
         print(f"Totale: {len(df)} - Calcolati: {conteggio.sum()}\n")
 
-
     except FileNotFoundError:
         print(f"Errore: Il file '{zip_path}' non è stato trovato.")
     except Exception as e:
         print(f"Si è verificato un errore: {e}")
 
 #view_csv("rf1.tensorflow.zip")
-image_preprocessing_csv("rf1.tensorflow.zip", xml_mode=False)
+image_preprocessing_csv(max_iter=100)
