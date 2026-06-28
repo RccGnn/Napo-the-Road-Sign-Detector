@@ -1,6 +1,8 @@
 import io
 import os
 import shutil
+from typing import Never
+
 import pandas as pd
 import pathlib
 """
@@ -22,10 +24,10 @@ def get_dataset_dir() -> pathlib.Path:
             Dataset/
             Scripts/
                 image_manipulation/
-                    functions.py    <<<
+                    functions.py <<<
 
     Returns:
-        pathlib.Path: il path delle cartella Dataset.
+        pathlib.Path: il path delle cartelle Dataset.
     """
     # __file__ è il path assoluto dello script in esecuzione
     this_file = pathlib.Path(__file__).resolve()
@@ -50,7 +52,7 @@ def find_csv_files() -> None:
             DataFrame contenente i dati letti dal file CSV.
     """
 
-    # Recupera il percorso della cartella Dataset e trasformalo in assoluto (con .resolve)
+    # Recupera il percorso della cartella Dataset e trasformalo in assoluto (con '.resolve')
     dataset_path = get_dataset_dir().resolve()
     global csv_list
 
@@ -87,8 +89,8 @@ def xml_to_csv(archive: zipfile.ZipFile, output_csv="annotations.csv") -> None:
         images/road1.png
 
     Args:
-        archive: file ZIP (es. "dataset.zip"), cercato in Dataset/
-        output_csv: Nome del CSV di output, salvato in Dataset/
+        archive: file ZIP (es. 'dataset.zip'), cercato in Dataset/
+        output_csv: Nome del CSV in output, salvato in Dataset/
     Returns:
         None: Come effetto collaterale viene creato un file .csv nella cartella /Dataset
     """
@@ -166,12 +168,12 @@ def image_preprocessing_csv(output_folder="pre-processed_images", delete_previou
             delete_previous: Se impostato a True, elimina la cartella `output_folder`
                 (se già esistente) e tutto il suo contenuto. Di default è False.
             max_iter: Il numero massimo di file da processare (principalmente per il testing)
-                Se impostato ad un numero negativo, processa tutti i file. Di default è -1.
+                Se impostato a un numero negativo, processa tutti i file. Di default è -1.
         Returns:
             None: La funzione non restituisce alcun valore. Ha come side-effect la creazione di una cartella d'immagini.
     """
 
-    # Recupera il percorso della cartella Dataset e trasformalo in assoluto (con .resolve)
+    # Recupera il percorso della cartella Dataset e trasformalo in assoluto (con '.resolve')
     dataset_path = get_dataset_dir().resolve()
 
     # Recupera anche output_folder rispetto a Dataset/ e non rispetto alla cwd
@@ -186,7 +188,7 @@ def image_preprocessing_csv(output_folder="pre-processed_images", delete_previou
     # Crea la cartella dove mettere le immagini modificate, se non esiste
     os.makedirs(output_folder, exist_ok=True)
 
-    # Salva e apri i file .csv di tutti i dataset, PRIMA di iniziare ad iterare sui dataset
+    # Salva e apri i file .csv di tutti i dataset, PRIMA di iniziare a iterare sui dataset
     global csv_list
     find_csv_files()
 
@@ -227,7 +229,7 @@ def image_preprocessing_csv(output_folder="pre-processed_images", delete_previou
 
                 if t.endswith((".jpeg", ".jpg", ".png")):
 
-                    # Recupera tutte le righe relative ad un jpeg
+                    # Recupera tutte le righe relative a un jpeg
                     for df in csv_list:
                         res = df.query(f"filename == '{os.path.basename(file_path)}'")
                         if not res.empty:
@@ -313,5 +315,43 @@ def view_csv(zip_path: str) -> None:
     except Exception as e:
         print(f"Si è verificato un errore: {e}")
 
-#view_csv("rf1.tensorflow.zip")
-image_preprocessing_csv(max_iter=100)
+def merge_csv_files(output_csv="merged.csv", exec_find_csv_files = False) -> pd.DataFrame:
+    """
+        Concatena tutti i DataFrame presenti nella lista globale 'csv_list' in un unico DataFrame
+        e lo salva come file CSV all'interno della cartella Dataset.
+
+        Se la lista globale `csv_list` è vuota, permette di scegliere se interrompere
+        l'operazione o tentare di recuperare i file automaticamente.
+
+        Args:
+            output_csv (str, opzionale): Il nome del file CSV di destinazione.
+                Di default è "merged.csv".
+            exec_find_csv_files (bool, opzionale): Se impostato a True e la lista è vuota,
+                esegue la funzione `find_csv_files()` per tentare di popolarla.
+                Se impostato a False, l'esecuzione si interrompe. Di default è False.
+        Returns:
+            pd.DataFrame: Il nuovo DataFrame combinato.
+            Restituisce `None` se la lista globale è vuota e `exec_find_csv_files` è False.
+        """
+    global csv_list
+
+    # Controlla se la lista è vuota
+    if not csv_list:
+        print("Warning: nessun file .csv letto.")
+        if exec_find_csv_files:
+            print("Lettura dei file .csv in corso...")
+            find_csv_files()
+        else:
+            return None
+
+    merged_csv = get_dataset_dir() / output_csv
+    # Concatena tutti i DataFrames nella lista
+    merged_df = pd.concat(csv_list, ignore_index=True)
+    # Crea il file .csv nella cartella Dataset
+    merged_df.to_csv(merged_csv, index=False)
+
+    return merged_df
+
+# Test
+m = merge_csv_files(exec_find_csv_files=True)
+print(m)
