@@ -38,7 +38,7 @@ def get_dataset_dir() -> pathlib.Path:
     raise FileNotFoundError("Cartella 'Dataset' non trovata.")
 
 
-def find_csv_file(csv_list: list[pd.DataFrame], archive: zipfile.ZipFile, file_list: list[str]) -> list[pd.DataFrame]:
+def find_csv_file(csv_list: list[pd.DataFrame], archive: zipfile.ZipFile) -> list[pd.DataFrame]:
     """
         Cerca il primo file CSV all'interno di un archivio ZIP e lo legge in un DataFrame,
         caricandolo tramite pandas.
@@ -46,13 +46,13 @@ def find_csv_file(csv_list: list[pd.DataFrame], archive: zipfile.ZipFile, file_l
         Args:
             csv_list: lista di DataFrame.
             archive (zipfile.ZipFile): L'oggetto archivio ZIP già aperto in modalità lettura.
-            file_list (list[str]): La lista dei nomi dei file (o percorsi) presenti nell'archivio.
 
         Returns:
             pd.DataFrame: Un nuovo DataFrame contenente i dati letti dal file CSV.
             Se non viene trovato alcun file CSV, restituisce il DataFrame `df` passato in input.
     """
     count = 3
+    file_list = archive.namelist()
     for file_path in file_list:
         if count > 0 and os.path.splitext(file_path)[1] == ".csv":
             df = pd.read_csv(archive.open(file_path))
@@ -183,7 +183,7 @@ def image_preprocessing_csv(zip_path: str, output_folder="pre-processed_images",
         # Recupera e apri il file .csv
         dataframes = []
         if not xml_mode:
-            dataframes = find_csv_file(dataframes, archive, file_list)
+            dataframes = find_csv_file(dataframes, archive)
         else:
             dataframes.append(xml_to_csv(archive))
 
