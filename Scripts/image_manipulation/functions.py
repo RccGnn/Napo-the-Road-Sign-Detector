@@ -139,7 +139,7 @@ def xml_to_csv(archive: zipfile.ZipFile, output_csv="annotations.csv") -> pd.Dat
     # Imposta le colonne del csv
     df = pd.DataFrame(rows, columns=["filename", "class", "xmin", "ymin", "xmax", "ymax"])
     df.to_csv(resolved_csv, index=False)
-    print(f"✅ - Trovate {len(rows)} bounding boxes da {len(xml_files)} file XML → '{resolved_csv}'")
+    print(f"✅ - Trovati {len(rows)} bounding boxes da {len(xml_files)} file XML → '{resolved_csv}'")
     return df
 
 
@@ -185,7 +185,7 @@ def image_preprocessing_csv(zip_path: str, output_folder="pre-processed_images",
         if not xml_mode:
             dataframes = find_csv_file(dataframes, archive, file_list)
         else:
-            df = xml_to_csv(archive)
+            dataframes.append(xml_to_csv(archive))
 
         # Se non sono stati trovati csv, termina
         if len(dataframes) == 0:
@@ -239,6 +239,7 @@ def image_preprocessing_csv(zip_path: str, output_folder="pre-processed_images",
                         with archive.open(file_path) as img_file:
                             img_data = io.BytesIO(img_file.read())
                             base_name = os.path.splitext(os.path.basename(file_path))[0]
+                            base_name= base_name[:50]
 
                             with Image.open(img_data) as img:
                                 # Taglia l'immagine
@@ -280,15 +281,18 @@ def view_csv(zip_path: str) -> None:
 
         print("\n--- INFORMAZIONI SUL DATASET ---")
         print(f"Totale righe: {len(df)}")
-        lista_classi = df['class'].unique()
-        print(f"Classi uniche trovate: {lista_classi}")
 
-        i = 0
-        for classi in lista_classi:
-            i += len(df[(df["class"] == classi)])
-            print(classi + ": " + str(len(df[(df["class"] == classi)])))
 
-        print(f"Totale: {len(df)} - Calcolati: {i}\n")
+        print(f"Righe con class NaN: {df['class'].isna().sum()}")
+
+        conteggio = df['class'].value_counts(dropna=False)
+        print(f"Classi uniche trovate: {conteggio.index.tolist()}")
+
+        for classe, count in conteggio.items():
+            print(f"{classe}: {count}")
+
+        print(f"Totale: {len(df)} - Calcolati: {conteggio.sum()}\n")
+
 
     except FileNotFoundError:
         print(f"Errore: Il file '{zip_path}' non è stato trovato.")
