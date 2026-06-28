@@ -38,13 +38,13 @@ def get_dataset_dir() -> pathlib.Path:
     raise FileNotFoundError("Cartella 'Dataset' non trovata.")
 
 
-def find_csv_file(df: pd.DataFrame, archive: zipfile.ZipFile, file_list: list[str]) -> pd.DataFrame:
+def find_csv_file(csv_list: list[pd.DataFrame], archive: zipfile.ZipFile, file_list: list[str]) -> list[pd.DataFrame]:
     """
         Cerca il primo file CSV all'interno di un archivio ZIP e lo legge in un DataFrame,
         caricandolo tramite pandas.
 
         Args:
-            df (pd.DataFrame): DataFrame di partenza (verrà sovrascritto con i dati del CSV trovato).
+            csv_list: lista di DataFrame.
             archive (zipfile.ZipFile): L'oggetto archivio ZIP già aperto in modalità lettura.
             file_list (list[str]): La lista dei nomi dei file (o percorsi) presenti nell'archivio.
 
@@ -52,13 +52,13 @@ def find_csv_file(df: pd.DataFrame, archive: zipfile.ZipFile, file_list: list[st
             pd.DataFrame: Un nuovo DataFrame contenente i dati letti dal file CSV.
             Se non viene trovato alcun file CSV, restituisce il DataFrame `df` passato in input.
     """
+    count = 3
     for file_path in file_list:
-        # Restituisce solo il secondo valore, l'estensione
-        parts = pathlib.Path(file_path).parts  # ('root', 'train', 'data.csv')
-        if "train" in parts and os.path.splitext(file_path)[1] == ".csv":
+        if count > 0 and os.path.splitext(file_path)[1] == ".csv":
             df = pd.read_csv(archive.open(file_path))
-            break
-    return df
+            csv_list.append(df)
+            count -= 1
+    return csv_list
 
 
 def xml_to_csv(archive: zipfile.ZipFile, output_csv="annotations.csv") -> pd.DataFrame:
@@ -139,7 +139,7 @@ def xml_to_csv(archive: zipfile.ZipFile, output_csv="annotations.csv") -> pd.Dat
     # Imposta le colonne del csv
     df = pd.DataFrame(rows, columns=["filename", "class", "xmin", "ymin", "xmax", "ymax"])
     df.to_csv(resolved_csv, index=False)
-    print(f"✅ - Trovati {len(rows)} bounding boxes da  {len(xml_files)} file XML → '{resolved_csv}'")
+    print(f"✅ - Trovate {len(rows)} bounding boxes da {len(xml_files)} file XML → '{resolved_csv}'")
     return df
 
 
@@ -176,23 +176,29 @@ def image_preprocessing_csv(zip_path: str, output_folder="pre-processed_images",
     # Crea la cartella dove mettere le immagini modificate, se non esiste
     os.makedirs(output_folder, exist_ok=True)
 
-
     # Esplora il file zip (come se fosse una cartella normale, evitando la decompressione)
     with (zipfile.ZipFile(zip_path, "r") as archive):
         file_list = archive.namelist()
 
         # Recupera e apri il file .csv
-        df = pd.DataFrame()
-
-        #
+        dataframes = []
         if not xml_mode:
-            df = find_csv_file(df, archive, file_list)
+            dataframes = find_csv_file(dataframes, archive, file_list)
         else:
             df = xml_to_csv(archive)
 
-        # Se df è vuoto, termina
-        if df.empty:
-            print("Warning: no annotation data found. Exiting.")
+        # Se non sono stati trovati csv, termina
+        if len(dataframes) == 0:
+            print("Warning: nessun file csv trovato.")
+
+        # Se ogni csv letto è vuoto, termina
+        flag = False
+        for df in dataframes:
+            if not df.empty:
+                flag = True
+                break
+        if not flag:
+            print("Warning: nessuna annotazione trovata.")
             return
 
         # File_path comprende tutti i file, anche cartelle o csv
@@ -214,7 +220,10 @@ def image_preprocessing_csv(zip_path: str, output_folder="pre-processed_images",
             if t.endswith((".jpeg", ".jpg", ".png")):
 
                 # Recupera tutte le righe relative ad un jpeg
-                res = df.query(f"filename == '{os.path.basename(file_path)}'")
+                for df in dataframes:
+                    res = df.query(f"filename == '{os.path.basename(file_path)}'")
+                    if not res.empty:
+                        break
 
                 if not res.empty:
                     # Itera su tutte le righe trovate per quella specifica immagine
@@ -241,14 +250,6 @@ def image_preprocessing_csv(zip_path: str, output_folder="pre-processed_images",
                                 print(f"Saved: {save_path}")
 
 import xml.etree.ElementTree as Et
-
-"""
-    1. Estrarre le classi univoche da un file xml casuale
-    2. per ogni file xml nel dataset inserire i dati nel file .csv
-"""
-
-#image_preprocessing_csv("rf1.tensorflow.zip")
-
 def view_csv(zip_path: str) -> None:
     """
     Visualizza il csw tramite pandas
@@ -295,5 +296,4 @@ def view_csv(zip_path: str) -> None:
         print(f"Si è verificato un errore: {e}")
 
 #view_csv("rf1.tensorflow.zip")
-
 image_preprocessing_csv("rf1.tensorflow.zip", xml_mode=False)
