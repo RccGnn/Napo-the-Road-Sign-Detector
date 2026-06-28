@@ -32,67 +32,64 @@ def plot_class_graph(title, classes, data_dict):
     # Crea figura e asse del grafico
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    # Posizioni sull'asse X (una per classe)
-    x = np.arange(len(classes))
+    # Posizioni sull'asse Y (una per classe)
+    y = np.arange(len(classes))
 
-    # Base iniziale per grafico a barre impilate
-    bottom = np.zeros(len(classes))
+    # Base iniziale per barre orizzontali impilate
+    left = np.zeros(len(classes))
 
     # Costruisce la matrice dei dati
     matrix = build_matrix(classes, data_dict)
 
-    # Per ogni dataset (stack delle barre)
+    # Disegna uno stack per ogni dataset
     for ds_id, (ds_name, color) in dataset_map.items():
 
-        # Prende i valori del dataset corrente
         values = np.array(matrix[ds_id])
 
-        # Disegna le barre (stacked bar chart)
-        ax.bar(
-            x,                 # posizione X
-            values,            # altezza barre
-            bottom=bottom,     # base (per impilare)
-            color=color,       # colore barre
-            edgecolor="white", # bordo bianco
-            linewidth=0.8,     # spessore bordo
-            label=ds_name      # nome legenda
+        ax.barh(
+            y,
+            values,
+            left=left,
+            color=color,
+            edgecolor="white",
+            linewidth=0.8,
+            label=ds_name
         )
 
-        # Aggiorna la base per il prossimo stack
-        bottom += values
+        left += values
 
-    # Imposta le etichette sull’asse X
-    ax.set_xticks(x)
+    # Etichette asse Y
+    ax.set_yticks(y)
+    ax.set_yticklabels(classes)
 
-    # Mostra i nomi delle classi ruotati per leggibilità
-    ax.set_xticklabels(classes, rotation=25, ha="right")
-
-    # Titolo del grafico
+    # Titolo
     ax.set_title(title, fontsize=16, fontweight="bold")
 
-    # Etichetta asse Y
-    ax.set_ylabel("Numero di segnali")
+    # Etichetta asse X
+    ax.set_xlabel("Numero di segnali")
 
-    # Scrive il totale sopra ogni barra
-    for i, total in enumerate(bottom):
-        ax.text(i, total, str(int(total)), ha="center", va="bottom")
+    # Totale alla fine di ogni barra
+    for i, total in enumerate(left):
+        ax.text(
+            total,
+            i,
+            str(int(total)),
+            va="center",
+            ha="left"
+        )
 
-    ax.set_ylim(0, max(bottom) * 1.15)  # Più margine superiore del grafo (asse y, ordinate).
-    # ax.set_ylim(0, 10000) # Visualizzazione con una scala fissa.
+    # Margine destro
+    ax.set_xlim(0, max(left) * 1.15)
 
-    # Crea legenda manuale con colori corretti
+    # Legenda
     handles = [
         Patch(facecolor=dataset_map[i][1], label=dataset_map[i][0])
         for i in dataset_map
     ]
 
-    # Mostra legenda sul grafico
     ax.legend(handles=handles, title="Dataset")
 
-    # Sistema automaticamente gli spazi
     plt.tight_layout()
-
-    # Mostra il grafico
     plt.show()
 
 """---"""
@@ -102,7 +99,7 @@ plot_class_graph(
     "Segnali d'obbligo",
     ["Turn Left", "Turn Right", "Straight", "Roundabout"],
     {
-        "Turn Left": [(1, 6132), (2, 732)],
+        "Turn Left": [(2, 6132), (3, 732)],
         "Turn Right": [(2, 6190)],
         "Straight": [(2, 6132), (3, 732)],
         "Roundabout": [(1, 327)]
