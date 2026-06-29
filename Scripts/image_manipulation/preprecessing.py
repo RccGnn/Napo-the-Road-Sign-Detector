@@ -24,7 +24,7 @@ def get_dataset_dir() -> pathlib.Path:
             Dataset/
             Scripts/
                 image_manipulation/
-                    functions.py <<<
+                    preprecessing.py <<<
 
     Returns:
         pathlib.Path: il path delle cartelle Dataset.
@@ -165,7 +165,7 @@ def xml_to_csv(archive: zipfile.ZipFile, output_csv="annotations.csv") -> None:
     csv_list.append(df)
 
 
-def image_preprocessing_csv(output_folder="pre-processed_images", delete_previous=False, max_iter=-1) -> None:
+def image_preprocessing_csv(output_folder="preprocessed_images", delete_previous=False, max_iter=-1) -> None:
     """
         Estrae tutte le immagini contenute in file zip nella cartella Dataset, le ritaglia in base ai bounding box
         e le memorizza in una cartella output_folder nella cartella Dataset assieme a un file csv contenente le
@@ -173,7 +173,7 @@ def image_preprocessing_csv(output_folder="pre-processed_images", delete_previou
 
         Args:
             output_folder: Il percorso della cartella in cui verranno salvate le immagini
-                ritagliate. Di default è "pre-processed_images".
+                ritagliate. Di default è "preprocessed_images".
             delete_previous: Se impostato a True, elimina la cartella `output_folder`
                 (se già esistente) e tutto il suo contenuto. Di default è False.
             max_iter: Il numero massimo di file da processare (principalmente per il testing)
@@ -201,7 +201,7 @@ def image_preprocessing_csv(output_folder="pre-processed_images", delete_previou
     global csv_list
     find_csv_files()
 
-    # Crea il file csv completo e mettilo nella cartella pre-processed_images
+    # Crea il file csv completo e mettilo nella cartella preprocessed_images
     merge_csv_files(output_folder / "merged.csv")
 
     # Se non sono stati trovati csv, termina
@@ -386,16 +386,13 @@ def merge_label( df: pd.DataFrame) -> pd.DataFrame:
         }
 
     df_unificato = df.copy()
-
     df_unificato['class'] = df_unificato['class'].replace(dizionario_etichette)
-
     return df_unificato
 
 
 
+# ==========================================
 # Test
-find_csv_files()
-print(csv_list)
-m = merge_csv_files(exec_find_csv_files=True)
-view_csv("merged.csv")
-#image_preprocessing_csv()
+# ==========================================
+if __name__ == "__main__":
+    image_preprocessing_csv()
