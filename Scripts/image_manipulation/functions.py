@@ -132,26 +132,28 @@ def xml_to_csv(archive: zipfile.ZipFile, output_csv="annotations.csv") -> None:
             # Nel tag object di xml è conservato il nome della classe a cui appartiene l'oggetto e il boundbox
             # Nel tag size di xml sono conservate le misure originali dell'immagine
 
+            # Il tag size è univoco per ogni immagine
             size = root.find("size")
 
+            # Invece, possono essere presenti anche più tag object (più ritagli per una foto)
             for obj in root.findall("object"):
                 class_tag = obj.find("name")
                 class_name = class_tag.text.strip() if class_tag is not None else ""
 
                 bndbox = obj.find("bndbox")
 
-            # Aggiungi alla riga del csv le informazioni ricavate
-            rows.append({
-                "filename": filename,
-                "class":    class_name,
-                "xmin":     int(float(bndbox.find("xmin").text)),
-                "ymin":     int(float(bndbox.find("ymin").text)),
-                "xmax":     int(float(bndbox.find("xmax").text)),
-                "ymax": int(float(bndbox.find("ymax").text)),
-                "width": int(float(size.find("width").text)),
-                "height": int(float(size.find("height").text)),
-                "depth":    int(float(size.find("depth").text)),
-            })
+                # Aggiungi alla riga del csv le informazioni ricavate
+                rows.append({
+                    "filename": filename,
+                    "class":    class_name,
+                    "xmin":     int(float(bndbox.find("xmin").text)),
+                    "ymin":     int(float(bndbox.find("ymin").text)),
+                    "xmax":     int(float(bndbox.find("xmax").text)),
+                    "ymax": int(float(bndbox.find("ymax").text)),
+                    "width": int(float(size.find("width").text)),
+                    "height": int(float(size.find("height").text)),
+                    "depth":    int(float(size.find("depth").text)),
+                })
 
         except Exception as e:
             print(f"Errore - {xml_path}: {e}")
@@ -241,6 +243,7 @@ def image_preprocessing_csv(output_folder="pre-processed_images", delete_previou
 
                     # Recupera tutte le righe relative a un jpeg
                     for df in csv_list:
+                        # Un'immagine appartiene ad un solo csv
                         res = df.query(f"filename == '{os.path.basename(file_path)}'")
                         if not res.empty:
                             break
