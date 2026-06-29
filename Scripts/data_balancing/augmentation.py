@@ -1,7 +1,8 @@
 import random
 from PIL import Image, ImageEnhance
 import numpy as np
-from image_manipulation import preprecessing as pp
+
+from Scripts.utilities import utility as u
 
 def add_gaussian_noise(image: Image.Image, sigma: float = 25) -> Image.Image:
     """
@@ -73,7 +74,7 @@ def augment_images(angle=15, brightness_range=(0.5, 1.5), modifiers=(True, True,
     if brightness_range[1] == 1 and brightness_range[0] == 1:
         modifiers[3] = False
 
-    dataset_dir = pp.get_dataset_dir()
+    dataset_dir = u.get_dataset_dir()
     input_path = dataset_dir / "preprocessed_images"
 
     output_path = dataset_dir / "augmented_images"
@@ -128,7 +129,6 @@ def augment_images(angle=15, brightness_range=(0.5, 1.5), modifiers=(True, True,
 
     # Per ogni foto sono create più mutazioni
     print(f"Create {counter * len(modifiers)} nuove immagini!")
-
 
 # ==========================================
 # Test

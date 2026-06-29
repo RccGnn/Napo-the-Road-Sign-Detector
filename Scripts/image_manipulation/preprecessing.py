@@ -1,8 +1,6 @@
 import io
 import os
 import shutil
-from typing import Never
-
 import pandas as pd
 import pathlib
 """
@@ -12,35 +10,12 @@ import pathlib
 """
 import zipfile
 from PIL import Image
+import xml.etree.ElementTree as Et
+
+from Scripts.utilities import utility as u
 
 # Variabile GLOBALE, lista di pandas.DataFrame
 csv_list = list[pd.DataFrame]()
-
-def get_dataset_dir() -> pathlib.Path:
-    """
-    Restituisce il percorso assoluto di un file nella cartella Dataset.
-    SI ASSUME CHE IL PROGETTO ABBIA LA SEGUENTE STRUTTURA:
-        <Napo-the-Road-Sign-Detector>/
-            Dataset/
-            Scripts/
-                image_manipulation/
-                    preprecessing.py <<<
-
-    Returns:
-        pathlib.Path: il path delle cartelle Dataset.
-    """
-    # __file__ è il path assoluto dello script in esecuzione
-    this_file = pathlib.Path(__file__).resolve()
-
-    # Risali le cartelle per costruire il path della cartella 'Dataset'
-    for parent in this_file.parents:
-        # Verifica se /Dataset è una cartella nel path
-        dataset_dir = parent / "Dataset"
-        if os.path.isdir(dataset_dir):
-            return dataset_dir
-
-    # Lancia errore
-    raise FileNotFoundError("Cartella 'Dataset' non trovata.")
 
 def find_csv_files() -> None:
     """
@@ -53,7 +28,7 @@ def find_csv_files() -> None:
     """
 
     # Recupera il percorso della cartella Dataset e trasformalo in assoluto (con '.resolve')
-    dataset_path = get_dataset_dir().resolve()
+    dataset_path = u.get_dataset_dir().resolve()
     global csv_list
 
     # Usa .glob("*.zip") per ciclare solo sui file con estensione .zip
@@ -96,7 +71,7 @@ def xml_to_csv(archive: zipfile.ZipFile, output_csv="annotations.csv") -> None:
     """
 
     # Crea un file .csv con il nella cartella Dataset con il nome output_csv
-    resolved_csv = get_dataset_dir() / output_csv
+    resolved_csv = u.get_dataset_dir() / output_csv
 
     rows = []
     file_list = archive.namelist()
@@ -183,10 +158,10 @@ def image_preprocessing_csv(output_folder="preprocessed_images", delete_previous
     """
 
     # Recupera il percorso della cartella Dataset e trasformalo in assoluto (con '.resolve')
-    dataset_path = get_dataset_dir().resolve()
+    dataset_path = u.get_dataset_dir().resolve()
 
     # Recupera anche output_folder rispetto a Dataset/ e non rispetto alla cwd
-    output_folder = get_dataset_dir() / output_folder
+    output_folder = u.get_dataset_dir() / output_folder
 
     # Elimina la cartella di nome output_folder se esiste e se 'delete_previous' = True
     if os.path.exists(output_folder) and delete_previous:
@@ -281,54 +256,6 @@ def image_preprocessing_csv(output_folder="preprocessed_images", delete_previous
     else:
         print(f"Salvate {counter} immagini! 😱")
 
-
-import xml.etree.ElementTree as Et
-def view_csv(zip_path: str) -> None:
-    """
-    Visualizza il csw tramite pandas
-    Args:
-        zip_path: Nome del dataset zippato, cioè [nome_dataset.zip]
-    Returns:
-        None: visualizza a schermo il dataset
-    """
-    # Risolve zip_path rispetto a Dataset/ e non rispetto alla cwd
-    resolved = get_dataset_dir() / zip_path
-
-    if resolved.suffix == ".csv":
-        df = pd.read_csv(resolved)
-    else:
-        with zipfile.ZipFile(resolved, "r") as archive:
-            file_list = archive.namelist()
-            df = pd.DataFrame()
-            df = find_csv_files(df, archive, file_list)
-
-    # ← Il try ora è FUORI da if/else, viene sempre eseguito
-    try:
-        pd.set_option('display.max_columns', None)
-        pd.set_option('display.width', 1000)
-        pd.set_option('display.max_rows', 50)
-
-        print("\n--- ANTEPRIMA DEL DATASET ---")
-        print(df)
-
-        print("\n--- INFORMAZIONI SUL DATASET ---")
-        print(f"Totale righe: {len(df)}")
-
-        print(f"Righe con class NaN: {df['class'].isna().sum()}")
-
-        conteggio = df['class'].value_counts(dropna=False)
-        print(f"Classi uniche trovate: {conteggio.index.tolist()}")
-
-        for classe, count in conteggio.items():
-            print(f"{classe}: {count}")
-
-        print(f"Totale: {len(df)} - Calcolati: {conteggio.sum()}\n")
-
-    except FileNotFoundError:
-        print(f"Errore: Il file '{zip_path}' non è stato trovato.")
-    except Exception as e:
-        print(f"Si è verificato un errore: {e}")
-
 def merge_csv_files(output_csv="merged.csv", exec_find_csv_files = False) -> pd.DataFrame:
     """
         Concatena tutti i DataFrame presenti nella lista globale 'csv_list' in un unico DataFrame
@@ -359,7 +286,7 @@ def merge_csv_files(output_csv="merged.csv", exec_find_csv_files = False) -> pd.
             return None
 
 
-    merged_csv = get_dataset_dir() / output_csv
+    merged_csv = u.get_dataset_dir() / output_csv
     # Concatena tutti i DataFrames nella lista
     merged_df = pd.concat(csv_list, ignore_index=True)
     merged_df = merge_label(merged_df)
@@ -388,7 +315,6 @@ def merge_label( df: pd.DataFrame) -> pd.DataFrame:
     df_unificato = df.copy()
     df_unificato['class'] = df_unificato['class'].replace(dizionario_etichette)
     return df_unificato
-
 
 
 # ==========================================
