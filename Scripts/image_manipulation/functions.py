@@ -197,6 +197,9 @@ def image_preprocessing_csv(output_folder="pre-processed_images", delete_previou
     global csv_list
     find_csv_files()
 
+    # Crea il file csv completo e mettilo nella cartella pre-processed_images
+    merge_csv_files(output_folder / "merged.csv")
+
     # Se non sono stati trovati csv, termina
     if len(csv_list) == 0:
         print("Warning: nessun file csv trovato.")
@@ -358,10 +361,6 @@ def merge_csv_files(output_csv="merged.csv", exec_find_csv_files = False) -> pd.
     return merged_df
 
 
-
-find_csv_files()
-print(csv_list[0])
-"""
-m = merge_csv_files(exec_find_csv_files=True)
-print(m)
-"""
+image_preprocessing_csv()
+# m = merge_csv_files(exec_find_csv_files=True)
+# print(m)
