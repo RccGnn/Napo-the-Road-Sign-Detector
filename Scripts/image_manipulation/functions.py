@@ -347,16 +347,38 @@ def merge_csv_files(output_csv="merged.csv", exec_find_csv_files = False) -> pd.
         else:
             return None
 
+
     merged_csv = get_dataset_dir() / output_csv
     # Concatena tutti i DataFrames nella lista
     merged_df = pd.concat(csv_list, ignore_index=True)
+    merged_df = merge_label(merged_df)
     # Crea il file .csv nella cartella Dataset
     merged_df.to_csv(merged_csv, index=False)
 
     return merged_df
 
+def merge_label( df: pd.DataFrame) -> pd.DataFrame:
+    dizionario_etichette = {
+        " Stop ": "Stop",
+        "do_not_turn_l" : "do_not_turn" ,
+        "do_not_turn_r" : "do_not_turn" ,
+        "no straight" : "do_not_turn",
+        "left" : "obligation",
+        "straight": "obligation",
+        "up": "slop" ,
+        "down": "slop",
+        }
+
+    df_unificato = df.copy()
+
+    df_unificato['class'] = df_unificato['class'].replace(dizionario_etichette)
+
+    return df_unificato
+
+
+
 # Test
 find_csv_files()
 print(csv_list)
 m = merge_csv_files(exec_find_csv_files=True)
-print(m)
+view_csv("merged.csv")
