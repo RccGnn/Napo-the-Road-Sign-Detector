@@ -140,18 +140,18 @@ def xml_to_csv(archive: zipfile.ZipFile, output_csv="annotations.csv") -> None:
 
                 bndbox = obj.find("bndbox")
 
-            # Aggiungi alla riga del csv le informazioni ricavate
-            rows.append({
-                "filename": filename,
-                "class":    class_name,
-                "xmin":     int(float(bndbox.find("xmin").text)),
-                "ymin":     int(float(bndbox.find("ymin").text)),
-                "xmax":     int(float(bndbox.find("xmax").text)),
-                "ymax": int(float(bndbox.find("ymax").text)),
-                "width": int(float(size.find("width").text)),
-                "height": int(float(size.find("height").text)),
-                "depth":    int(float(size.find("depth").text)),
-            })
+                # Aggiungi alla riga del csv le informazioni ricavate
+                rows.append({
+                    "filename": filename,
+                    "class":    class_name,
+                    "xmin":     int(float(bndbox.find("xmin").text)),
+                    "ymin":     int(float(bndbox.find("ymin").text)),
+                    "xmax":     int(float(bndbox.find("xmax").text)),
+                    "ymax": int(float(bndbox.find("ymax").text)),
+                    "width": int(float(size.find("width").text)),
+                    "height": int(float(size.find("height").text)),
+                    "depth":    int(float(size.find("depth").text)),
+                })
 
         except Exception as e:
             print(f"Errore - {xml_path}: {e}")
@@ -372,6 +372,11 @@ def merge_label( df: pd.DataFrame) -> pd.DataFrame:
         "straight": "obligation",
         "up": "slop" ,
         "down": "slop",
+        "Speed Limit -100-" : "speedlimit",
+        "Speed Limit -60-" : "speedlimit",
+        "Speed Limit -70-" : "speedlimit",
+        "Speed Limit -80-" : "speedlimit",
+        "Speed Limit 30"   : "speedlimit",
         }
 
     df_unificato = df.copy()
