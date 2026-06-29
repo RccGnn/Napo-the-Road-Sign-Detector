@@ -13,8 +13,8 @@ import pathlib
 import zipfile
 from PIL import Image
 
-# Variabile GLOBALE
-csv_list = []
+# Variabile GLOBALE, lista di pandas.DataFrame
+csv_list = list[pd.DataFrame]()
 
 def get_dataset_dir() -> pathlib.Path:
     """
@@ -65,16 +65,16 @@ def find_csv_files() -> None:
             if "xml" in str(zip_path):
                 # Per gli archivi di dataset che hanno annotazioni sottoforma di XML pascal
                 xml_to_csv(archive)
+            else:
+                file_list = archive.namelist()
+                for file_path in file_list:
 
-            file_list = archive.namelist()
-            for file_path in file_list:
-
-                # Scegli solo i file in train
-                root, ext = os.path.splitext(file_path)
-                if ext == ".csv" and "train" in root:
-                    df = pd.read_csv(archive.open(file_path))
-                    csv_list.append(df)
-                    break
+                    # Scegli solo i file in train
+                    root, ext = os.path.splitext(file_path)
+                    if ext == ".csv" and "train" in root:
+                        df = pd.read_csv(archive.open(file_path))
+                        csv_list.append(df)
+                        break
 
 
 def xml_to_csv(archive: zipfile.ZipFile, output_csv="annotations.csv") -> None:
@@ -134,19 +134,22 @@ def xml_to_csv(archive: zipfile.ZipFile, output_csv="annotations.csv") -> None:
                 class_tag = obj.find("name")
                 class_name = class_tag.text.strip() if class_tag is not None else ""
 
+                size = obj.find("size")
                 bndbox = obj.find("bndbox")
-                if bndbox is None:
-                    continue
 
-                # Aggiungi alla riga del csv le informazioni ricavate
-                rows.append({
-                    "filename": filename,
-                    "class":    class_name,
-                    "xmin":     int(float(bndbox.find("xmin").text)),
-                    "ymin":     int(float(bndbox.find("ymin").text)),
-                    "xmax":     int(float(bndbox.find("xmax").text)),
-                    "ymax":     int(float(bndbox.find("ymax").text)),
-                })
+                if bndbox is not None and size is not None:
+                    # Aggiungi alla riga del csv le informazioni ricavate
+                    rows.append({
+                        "filename": filename,
+                        "class":    class_name,
+                        "width":    int(float(size.find("width").text)),
+                        "height":   int(float(size.find("height").text)),
+                        "depth":    int(float(size.find("depth").text)),
+                        "xmin":     int(float(bndbox.find("xmin").text)),
+                        "ymin":     int(float(bndbox.find("ymin").text)),
+                        "xmax":     int(float(bndbox.find("xmax").text)),
+                        "ymax":     int(float(bndbox.find("ymax").text)),
+                    })
 
         except Exception as e:
             print(f"Errore - {xml_path}: {e}")
@@ -353,5 +356,7 @@ def merge_csv_files(output_csv="merged.csv", exec_find_csv_files = False) -> pd.
     return merged_df
 
 # Test
+find_csv_files()
+print(csv_list)
 m = merge_csv_files(exec_find_csv_files=True)
 print(m)
