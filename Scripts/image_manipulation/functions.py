@@ -378,6 +378,11 @@ def merge_label( df: pd.DataFrame) -> pd.DataFrame:
         "straight": "obligation",
         "up": "slop" ,
         "down": "slop",
+        "Speed Limit -100-" : "speedlimit",
+        "Speed Limit -60-" : "speedlimit",
+        "Speed Limit -70-" : "speedlimit",
+        "Speed Limit -80-" : "speedlimit",
+        "Speed Limit 30"   : "speedlimit",
         }
 
     df_unificato = df.copy()
