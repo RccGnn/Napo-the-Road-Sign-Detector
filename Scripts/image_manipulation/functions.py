@@ -144,20 +144,20 @@ def xml_to_csv(archive: zipfile.ZipFile, output_csv="annotations.csv") -> None:
             rows.append({
                 "filename": filename,
                 "class":    class_name,
-                "width":    int(float(size.find("width").text)),
-                "height":   int(float(size.find("height").text)),
-                "depth":    int(float(size.find("depth").text)),
                 "xmin":     int(float(bndbox.find("xmin").text)),
                 "ymin":     int(float(bndbox.find("ymin").text)),
                 "xmax":     int(float(bndbox.find("xmax").text)),
-                "ymax":     int(float(bndbox.find("ymax").text)),
+                "ymax": int(float(bndbox.find("ymax").text)),
+                "width": int(float(size.find("width").text)),
+                "height": int(float(size.find("height").text)),
+                "depth":    int(float(size.find("depth").text)),
             })
 
         except Exception as e:
             print(f"Errore - {xml_path}: {e}")
 
     # Imposta le colonne del csv
-    df = pd.DataFrame(rows, columns=["filename", "class", "width", "height", "depth", "xmin", "ymin", "xmax", "ymax"])
+    df = pd.DataFrame(rows, columns=["filename", "class",  "xmin", "ymin", "xmax", "ymax", "width", "height", "depth",])
     df.to_csv(resolved_csv, index=False)
     print(f"✅ - Trovati {len(rows)} bounding boxes da {len(xml_files)} file XML → '{resolved_csv}'")
     csv_list.append(df)
@@ -355,15 +355,39 @@ def merge_csv_files(output_csv="merged.csv", exec_find_csv_files = False) -> pd.
         else:
             return None
 
+
     merged_csv = get_dataset_dir() / output_csv
     # Concatena tutti i DataFrames nella lista
     merged_df = pd.concat(csv_list, ignore_index=True)
+    merged_df = merge_label(merged_df)
     # Crea il file .csv nella cartella Dataset
     merged_df.to_csv(merged_csv, index=False)
 
     return merged_df
 
+def merge_label( df: pd.DataFrame) -> pd.DataFrame:
+    dizionario_etichette = {
+        " Stop ": "Stop",
+        "do_not_turn_l" : "do_not_turn" ,
+        "do_not_turn_r" : "do_not_turn" ,
+        "no straight" : "do_not_turn",
+        "left" : "obligation",
+        "straight": "obligation",
+        "up": "slop" ,
+        "down": "slop",
+        }
 
-image_preprocessing_csv()
-# m = merge_csv_files(exec_find_csv_files=True)
-# print(m)
+    df_unificato = df.copy()
+
+    df_unificato['class'] = df_unificato['class'].replace(dizionario_etichette)
+
+    return df_unificato
+
+
+
+# Test
+find_csv_files()
+print(csv_list)
+m = merge_csv_files(exec_find_csv_files=True)
+view_csv("merged.csv")
+#image_preprocessing_csv()
