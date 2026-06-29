@@ -165,7 +165,9 @@ def xml_to_csv(archive: zipfile.ZipFile, output_csv="annotations.csv") -> None:
 
 def image_preprocessing_csv(output_folder="pre-processed_images", delete_previous=False, max_iter=-1) -> None:
     """
-        Estrae immagini da un archivio ZIP, le ritaglia in base ai bounding box.
+        Estrae tutte le immagini contenute in file zip nella cartella Dataset, le ritaglia in base ai bounding box
+        e le memorizza in una cartella output_folder nella cartella Dataset assieme a un file csv contenente le
+        informazioni di tutte le immagini ritagliate.
 
         Args:
             output_folder: Il percorso della cartella in cui verranno salvate le immagini
@@ -243,6 +245,7 @@ def image_preprocessing_csv(output_folder="pre-processed_images", delete_previou
                         if not res.empty:
                             break
 
+                    # CROP delle immagini
                     if not res.empty:
                         # Itera su tutte le righe trovate per quella specifica immagine
                         for index, row in res.iterrows():
