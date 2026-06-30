@@ -7,6 +7,8 @@ import zipfile
 from PIL import Image
 import xml.etree.ElementTree as Et
 
+from fontTools.ttLib.tables.grUtils import entries
+
 from Scripts.utilities import utility as u
 
 """
@@ -15,7 +17,31 @@ from Scripts.utilities import utility as u
     di profondità e dove il nome di un file è il suo path completo con il file zip alla radice .
 """
 
-entries=[{}]
+entries=[
+    {
+        "filename": "prova5.png",
+        "class": "trafficlight",
+        "xmin": 98,
+        "ymin": 62,
+        "xmax": 208,
+        "ymax": 232,
+        "width": 267,
+        "height": 400,
+        "depth": 3.0
+    },
+    {
+        "filename": "prova6.png",
+        "class": "trafficlight",
+        "xmin": 98,
+        "ymin": 62,
+        "xmax": 208,
+        "ymax": 232,
+        "width": 267,
+        "height": 400,
+        "depth": 3.0
+    }
+
+]
 
 # Variabile GLOBALE, lista di pandas.DataFrame
 csv_list = list[pd.DataFrame]()
@@ -402,32 +428,6 @@ def add_entries(file_csv, entries: list) -> pd.DataFrame:
 
     return df
 
-entries = [
-    {
-        "filename": "prova5.png",
-        "class": "trafficlight",
-        "xmin": 98,
-        "ymin": 62,
-        "xmax": 208,
-        "ymax": 232,
-        "width": 267,
-        "height": 400,
-        "depth": 3.0
-    },
-    {
-        "filename": "prova6.png",
-        "class": "trafficlight",
-        "xmin": 98,
-        "ymin": 62,
-        "xmax": 208,
-        "ymax": 232,
-        "width": 267,
-        "height": 400,
-        "depth": 3.0
-    }
-
-]
-
 
 
 def filter_and_replace_csv(csv_label_class, df: pd.DataFrame) -> pd.DataFrame:
@@ -437,6 +437,9 @@ def filter_and_replace_csv(csv_label_class, df: pd.DataFrame) -> pd.DataFrame:
         print(f"Warning: la classe '{csv_label_class}' non è presente in questo DataFrame.")
 
     df_filtrato = df[df['class'] != csv_label_class]
+    add_entries(df_filtrato, entries)
+
+    return df_filtrato
 
 
 # ==========================================
