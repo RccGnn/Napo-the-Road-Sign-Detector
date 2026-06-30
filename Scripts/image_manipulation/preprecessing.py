@@ -3,21 +3,22 @@ import os
 import shutil
 import pandas as pd
 import pathlib
-"""
-    Il modulo zipfile permette di esplorare un file zip come se fosse una normale cartella, con
-    l'unica differenza che tutti i file e le cartelle sono listati come delle stringhe allo stesso livello 
-    di profondità e dove il nome di un file è il suo path completo con il file zip alla radice .
-"""
 import zipfile
 from PIL import Image
 import xml.etree.ElementTree as Et
 
 from Scripts.utilities import utility as u
 
+"""
+    Il modulo zipfile permette di esplorare un file zip come se fosse una normale cartella, con
+    l'unica differenza che tutti i file e le cartelle sono listati come delle stringhe allo stesso livello 
+    di profondità e dove il nome di un file è il suo path completo con il file zip alla radice .
+"""
+
+
 # Variabile GLOBALE, lista di pandas.DataFrame
 csv_list = list[pd.DataFrame]()
 
-<<<<<<<< HEAD:Scripts/image_manipulation/Csv_manipulation.py
 def get_dataset_dir() -> pathlib.Path:
     """
     Restituisce il percorso assoluto di un file nella cartella Dataset.
@@ -44,8 +45,7 @@ def get_dataset_dir() -> pathlib.Path:
     # Lancia errore
     raise FileNotFoundError("Cartella 'Dataset' non trovata.")
 
-========
->>>>>>>> 7a6438bc32cd4a927605da85bc0c3a0e6a3a46e0:Scripts/image_manipulation/preprecessing.py
+
 def find_csv_files() -> None:
     """
         Cerca il primo file CSV all'interno di un archivio ZIP e lo legge in un DataFrame,
@@ -321,25 +321,26 @@ def merge_csv_files(output_csv="merged.csv", exec_find_csv_files = False) -> pd.
     merged_df = merge_label(merged_df)
     # Crea il file .csv nella cartella Dataset
     merged_df.to_csv(merged_csv, index=False)
+    u.view_csv(merged_csv)
 
     return merged_df
 
 def merge_label( df: pd.DataFrame) -> pd.DataFrame:
     dizionario_etichette = {
-        " Stop ": "Stop",
+        "stop": "Stop",
         "do_not_turn_l" : "do_not_turn" ,
         "do_not_turn_r" : "do_not_turn" ,
         "no straight" : "do_not_turn",
         "left" : "obligation",
         "straight": "obligation",
-        "up": "slop" ,
+        "up": "slope" ,
         "down": "slop",
         "Speed Limit -100-" : "speedlimit",
         "Speed Limit -60-" : "speedlimit",
         "Speed Limit -70-" : "speedlimit",
         "Speed Limit -80-" : "speedlimit",
         "Speed Limit 30"   : "speedlimit",
-        }
+    }
 
     df_unificato = df.copy()
     df_unificato['class'] = df_unificato['class'].replace(dizionario_etichette)
@@ -350,4 +351,4 @@ def merge_label( df: pd.DataFrame) -> pd.DataFrame:
 # Test
 # ==========================================
 if __name__ == "__main__":
-    image_preprocessing_csv()
+    merge_csv_files(output_csv="merged.csv", exec_find_csv_files=True)
