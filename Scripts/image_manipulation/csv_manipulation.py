@@ -6,6 +6,9 @@ import pathlib
 import zipfile
 from PIL import Image
 import xml.etree.ElementTree as Et
+import csv
+
+from fontTools.ttLib.tables.grUtils import entries
 
 from Scripts.utilities import utility as u
 
@@ -15,9 +18,58 @@ from Scripts.utilities import utility as u
     di profondità e dove il nome di un file è il suo path completo con il file zip alla radice .
 """
 
+entries=[]
 
 # Variabile GLOBALE, lista di pandas.DataFrame
 csv_list = list[pd.DataFrame]()
+
+
+def carica_entries(file):
+    global entries
+    pathfile = pathlib.Path(__file__).parent / file
+
+    if not pathfile.exists():
+        print(f"Errore: Il file {file} non esiste in {pathfile}")
+        return []
+
+    with open(pathfile, mode="r", encoding="utf-8") as f:
+        # Usiamo reader classico perché il file contiene solo dati, senza header
+        lettore_csv = csv.reader(f)
+
+        for riga in lettore_csv:
+            if not riga:
+                continue  # Salta eventuali righe vuote
+
+            # Puliamo ogni elemento da spazi bianchi extra
+            riga = [elemento.strip() for elemento in riga]
+
+            # Creiamo il dizionario base con tutti i campi a None
+            dizionario_generico = {
+                "filename": None, "class": None,
+                "xmin": None, "ymin": None, "xmax": None, "ymax": None,
+                "width": None, "height": None, "depth": None
+            }
+
+            # Assegniamo i dati in base a quanti elementi sono scritti nella riga
+            lunghezza = len(riga)
+
+            if lunghezza >= 6:
+                dizionario_generico["filename"] = riga[0]
+                dizionario_generico["class"] = riga[1]
+                dizionario_generico["xmin"] = int(float(riga[2]))
+                dizionario_generico["ymin"] = int(float(riga[3]))
+                dizionario_generico["xmax"] = int(float(riga[4]))
+                dizionario_generico["ymax"] = int(float(riga[5]))
+
+            # Se il file è più lungo e ha anche width, height e depth (quindi almeno 9 colonne)
+            if lunghezza >= 9:
+                dizionario_generico["width"] = int(float(riga[6]))
+                dizionario_generico["height"] = int(float(riga[7]))
+                dizionario_generico["depth"] = float(riga[8])
+
+            entries.append(dizionario_generico)
+
+    print(f"Caricate con successo {len(entries)} entries dal file {file} di testo.")
 
 def get_dataset_dir() -> pathlib.Path:
     """
@@ -346,7 +398,7 @@ def merge_label( df: pd.DataFrame) -> pd.DataFrame:
     df_unificato['class'] = df_unificato['class'].replace(dizionario_etichette)
     return df_unificato
 
-def add_entries(file_csv, entries: list, ) -> pd.DataFrame:
+def add_entries(df:pd.DataFrame,file_csv:str,file_entries:str) -> pd.DataFrame:
     """
     Aggiunge nuove righe ad un file CSV.
 
@@ -357,22 +409,8 @@ def add_entries(file_csv, entries: list, ) -> pd.DataFrame:
     Returns:
         pd.DataFrame: il DataFrame aggiornato.
     """
-
-    # Se viene passato solo il nome del file, cercalo nella cartella Dataset
-    file_csv = pathlib.Path(file_csv)
-    if not file_csv.is_absolute():
-        file_csv = u.get_dataset_dir() / file_csv
-
-    # Controlla che il file esista
-    if not file_csv.exists():
-        raise FileNotFoundError(f"File non trovato: {file_csv}")
-
-    # Legge il CSV
-    df = pd.read_csv(file_csv)
-
-    # Elimina l'eventuale colonna degli indici
-    if "Unnamed: 0" in df.columns:
-        df = df.drop(columns=["Unnamed: 0"])
+    global entries
+    carica_entries(file_entries)
 
     # Nessuna entry da aggiungere
     if not entries:
@@ -394,9 +432,10 @@ def add_entries(file_csv, entries: list, ) -> pd.DataFrame:
     df = pd.concat([df, new_df], ignore_index=True)
 
     # Salva il CSV aggiornato (senza indice)
+    file_csv=u.get_dataset_dir() / file_csv
     df.to_csv(file_csv, index=False)
 
-    print(f"Aggiunte {len(new_df)} nuove righe a '{file_csv.name}'.")
+    print(f"Aggiunte {len(new_df)} nuove righe a '{file_csv}'.")
     print(df.tail())
 
     return df
@@ -454,15 +493,29 @@ def delete_entries(file_csv, entries: list) -> pd.DataFrame:
 
     return df
 
-entries = [
-    {
-        "filename": "prova5.png",
-    }
 
-]
+
+def filter_and_replace_csv(csv_label_class, df: pd.DataFrame) -> pd.DataFrame:
+    global entries
+
+    if csv_label_class not in df['class'].values:
+        print(f"Warning: la classe '{csv_label_class}' non è presente in questo DataFrame.")
+
+    df_filtrato = df[df['class'] != csv_label_class]
+    print(df_filtrato.head())
+    print("dopo filtro")
+    add_entries(df_filtrato,"merged.csv" ,"entries.txt")
+
+
+    return df_filtrato
+
 
 # ==========================================
 # Test
 # ==========================================
 if __name__ == "__main__":
-    delete_entries("merged.csv", entries)
+    m=merge_csv_files("merged.csv", True)
+    filter_and_replace_csv("trafficlight",m)
+
+
+
