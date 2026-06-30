@@ -3,7 +3,7 @@ import pathlib
 import zipfile
 import pandas as pd
 
-from image_manipulation.preprecessing import find_csv_files
+from Scripts.image_manipulation.csv_manipulation import find_csv_files
 
 
 def get_dataset_dir() -> pathlib.Path:

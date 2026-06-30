@@ -8,9 +8,8 @@ plt.style.use('_mpl-gallery') # Imposta uno stile grafico di matplotlib.
 # Dizionario: ID dataset → (nome dataset, colore del grafico)
 dataset_map = {
     1: ("rf1.tensorflow", "royalblue"),
-    2: ("rf2.tensorflow", "darkorange"),
     3: ("rf3.tensorflow", "forestgreen"),
-    4: ("annotations.csv", "crimson")
+    4: ("annotations.csv", "pink")
 }
 
 """---"""
@@ -97,11 +96,10 @@ def plot_class_graph(title, classes, data_dict):
 # GRAFICO 1
 plot_class_graph(
     "Segnali d'obbligo",
-    ["Turn Left", "Turn Right", "Straight", "Roundabout"],
+    ["Turn Left", "Straight", "Roundabout"],
     {
-        "Turn Left": [(2, 6132), (3, 732)],
-        "Turn Right": [(2, 6190)],
-        "Straight": [(2, 6132), (3, 732)],
+        "Turn Left": [(3, 732)],
+        "Straight": [(3, 732)],
         "Roundabout": [(1, 327)]
     }
 )
@@ -126,8 +124,8 @@ plot_class_graph(
     ["No Entry", "No Right", "No Straight", "No Left"],
     {
         "No Entry": [(1, 724)],
-        "No Right": [(1, 150), (3, 696)],
-        "No Straight": [(3, 768)],
+        "No Right": [(1, 150), (3, 300)],
+        "No Straight": [(3, 300)],
         "No Left": [(1, 168)]
     }
 )
@@ -137,32 +135,31 @@ plot_class_graph(
     "Segnali di precedenza",
     ["Yield", "Stop"],
     {
-        "Stop": [(1, 427), (2, 3054), (4, 91)],
-        "Yield": [(1, 321), (2, 8648)]
+        "Stop": [(1, 427), (4, 91)],
+        "Yield": [(1, 321)]
     }
 )
 
 # GRAFICO 5
 plot_class_graph(
     "Segnaletica luminosa",
-    ["Non classificati", "Green", "Yellow", "Red"],
+    ["Green", "Yellow", "Red"],
     {
-        "Non classificati": [(4, 170)],
-        "Red": [(1, 489), (3, 714)],
-        "Yellow": [(1, 233)],
-        "Green": [(1, 1741), (3, 678)]
+        "Red": [(1, 489), (3, 26)],
+        "Yellow": [(1, 233), (4,1)],
+        "Green": [(1, 700), (4, 15)]
     }
 )
 
 # GRAFICO 6
 plot_class_graph(
     "Segnali di pericolo",
-    ["Hazard", "Workers Ahead", "Speed Bump", "Slope", "Cross Walk"],
+    ["Hazard", "Speed Bump", "Slope Down", "Slope Up", "Cross Walk"],
     {
         "Hazard": [(1, 507)],
-        "Workers Ahead": [(2, 646)],
         "Speed Bump": [(1, 300)],
-        "Slope": [(3, 1428)],
+        "Slope Down": [(3, 336)],
+        "Slope Up": [(3, 378)],
         "Cross Walk": [(4, 200)]
     }
 )

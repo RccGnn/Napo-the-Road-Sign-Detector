@@ -3,53 +3,73 @@ import os
 import shutil
 import pandas as pd
 import pathlib
+import zipfile
+from PIL import Image
+import xml.etree.ElementTree as Et
+import csv
+
+from fontTools.ttLib.tables.grUtils import entries
+
+from Scripts.utilities import utility as u
+
 """
     Il modulo zipfile permette di esplorare un file zip come se fosse una normale cartella, con
     l'unica differenza che tutti i file e le cartelle sono listati come delle stringhe allo stesso livello 
     di profondità e dove il nome di un file è il suo path completo con il file zip alla radice .
 """
-import zipfile
-from PIL import Image
-import xml.etree.ElementTree as Et
 
-from Scripts.utilities import utility as u
+entries=[]
 
 # Variabile GLOBALE, lista di pandas.DataFrame
 csv_list = list[pd.DataFrame]()
 
-def find_csv_files() -> None:
-    """
-        Cerca il primo file CSV all'interno di un archivio ZIP e lo legge in un DataFrame,
-        caricandolo tramite pandas.
 
-        Returns:
-            None: Come effetto collaterale vengono aggiunti nella lista globale csv_list i
-            DataFrame contenente i dati letti dal file CSV.
-    """
+def carica_entries(file):
+    global entries
+    pathfile = pathlib.Path(__file__).parent / file
 
-    # Recupera il percorso della cartella Dataset e trasformalo in assoluto (con '.resolve')
-    dataset_path = u.get_dataset_dir().resolve()
-    global csv_list
+    if not pathfile.exists():
+        print(f"Errore: Il file {file} non esiste in {pathfile}")
+        return []
 
-    # Usa .glob("*.zip") per ciclare solo sui file con estensione .zip
-    for zip_path in dataset_path.glob("*.zip"):
+    with open(pathfile, mode="r", encoding="utf-8") as f:
+        # Usiamo reader classico perché il file contiene solo dati, senza header
+        lettore_csv = csv.reader(f)
 
-        # Esplora il file zip (come se fosse una cartella normale, evitando la decompressione)
-        with (zipfile.ZipFile(zip_path, "r") as archive):
+        for riga in lettore_csv:
+            if not riga:
+                continue  # Salta eventuali righe vuote
 
-            if "xml" in str(zip_path):
-                # Per gli archivi di dataset che hanno annotazioni sottoforma di XML pascal
-                xml_to_csv(archive)
-            else:
-                file_list = archive.namelist()
-                for file_path in file_list:
+            # Puliamo ogni elemento da spazi bianchi extra
+            riga = [elemento.strip() for elemento in riga]
 
-                    # Scegli solo i file in train
-                    root, ext = os.path.splitext(file_path)
-                    if ext == ".csv" and "train" in root:
-                        df = pd.read_csv(archive.open(file_path))
-                        csv_list.append(df)
-                        break
+            # Creiamo il dizionario base con tutti i campi a None
+            dizionario_generico = {
+                "filename": None, "class": None,
+                "xmin": None, "ymin": None, "xmax": None, "ymax": None,
+                "width": None, "height": None, "depth": None
+            }
+
+            # Assegniamo i dati in base a quanti elementi sono scritti nella riga
+            lunghezza = len(riga)
+
+            if lunghezza >= 6:
+                dizionario_generico["filename"] = riga[0]
+                dizionario_generico["class"] = riga[1]
+                dizionario_generico["xmin"] = int(float(riga[2]))
+                dizionario_generico["ymin"] = int(float(riga[3]))
+                dizionario_generico["xmax"] = int(float(riga[4]))
+                dizionario_generico["ymax"] = int(float(riga[5]))
+
+            # Se il file è più lungo e ha anche width, height e depth (quindi almeno 9 colonne)
+            if lunghezza >= 9:
+                dizionario_generico["width"] = int(float(riga[6]))
+                dizionario_generico["height"] = int(float(riga[7]))
+                dizionario_generico["depth"] = float(riga[8])
+
+            entries.append(dizionario_generico)
+
+    print(f"Caricate con successo {len(entries)} entries dal file {file} di testo.")
 
 
 def xml_to_csv(archive: zipfile.ZipFile, output_csv="annotations.csv") -> None:
@@ -256,6 +276,41 @@ def image_preprocessing_csv(output_folder="preprocessed_images", delete_previous
     else:
         print(f"Salvate {counter} immagini! 😱")
 
+def find_csv_files() -> None:
+    """
+        Cerca il primo file CSV all'interno di un archivio ZIP e lo legge in un DataFrame,
+        caricandolo tramite pandas.
+
+        Returns:
+            None: Come effetto collaterale vengono aggiunti nella lista globale csv_list i
+            DataFrame contenente i dati letti dal file CSV.
+    """
+
+    # Recupera il percorso della cartella Dataset e trasformalo in assoluto (con '.resolve')
+    dataset_path = u.get_dataset_dir().resolve()
+    global csv_list
+
+    # Usa .glob(".zip") per ciclare solo sui file con estensione .zip
+    for zip_path in dataset_path.glob("*.zip"):
+
+        # Esplora il file zip (come se fosse una cartella normale, evitando la decompressione)
+        with (zipfile.ZipFile(zip_path, "r") as archive):
+
+            if "xml" in str(zip_path):
+                # Per gli archivi di dataset che hanno annotazioni sottoforma di XML pascal
+                xml_to_csv(archive)
+            else:
+                file_list = archive.namelist()
+                for file_path in file_list:
+
+                    # Scegli solo i file in train
+                    root, ext = os.path.splitext(file_path)
+                    if ext == ".csv" and "train" in root:
+                        df = pd.read_csv(archive.open(file_path))
+                        csv_list.append(df)
+                        break
+
+
 def merge_csv_files(output_csv="merged.csv", exec_find_csv_files = False) -> pd.DataFrame:
     """
         Concatena tutti i DataFrame presenti nella lista globale 'csv_list' in un unico DataFrame
@@ -292,33 +347,150 @@ def merge_csv_files(output_csv="merged.csv", exec_find_csv_files = False) -> pd.
     merged_df = merge_label(merged_df)
     # Crea il file .csv nella cartella Dataset
     merged_df.to_csv(merged_csv, index=False)
+    u.view_csv(merged_csv)
 
     return merged_df
 
 def merge_label( df: pd.DataFrame) -> pd.DataFrame:
     dizionario_etichette = {
-        " Stop ": "Stop",
+        "stop": "Stop",
         "do_not_turn_l" : "do_not_turn" ,
         "do_not_turn_r" : "do_not_turn" ,
         "no straight" : "do_not_turn",
         "left" : "obligation",
         "straight": "obligation",
-        "up": "slop" ,
-        "down": "slop",
+        "up": "slope" ,
+        "down": "slope",
         "Speed Limit -100-" : "speedlimit",
         "Speed Limit -60-" : "speedlimit",
         "Speed Limit -70-" : "speedlimit",
         "Speed Limit -80-" : "speedlimit",
         "Speed Limit 30"   : "speedlimit",
-        }
+    }
 
     df_unificato = df.copy()
     df_unificato['class'] = df_unificato['class'].replace(dizionario_etichette)
     return df_unificato
+
+def filter_and_replace_csv(csv_label_class, df: pd.DataFrame) -> pd.DataFrame:
+    global entries
+
+    if csv_label_class not in df['class'].values:
+        print(f"Warning: la classe '{csv_label_class}' non è presente in questo DataFrame.")
+
+    df_filtrato = df[df['class'] != csv_label_class]
+    print(df_filtrato.head())
+    print("dopo filtro")
+    add_entries(df_filtrato,"merged.csv" ,"entries.txt")
+
+
+    return df_filtrato
+
+
+def add_entries(df:pd.DataFrame,file_csv:str,file_entries:str) -> pd.DataFrame:
+    """
+    Aggiunge nuove righe ad un file CSV.
+
+    Args:
+        file_csv: percorso del file CSV oppure solo il suo nome.
+        entries: lista di dizionari contenenti le nuove righe.
+
+    Returns:
+        pd.DataFrame: il DataFrame aggiornato.
+    """
+    global entries
+    carica_entries(file_entries)
+
+    # Nessuna entry da aggiungere
+    if not entries:
+        print("Nessuna entry da aggiungere.")
+        return df
+
+    # Converte le nuove righe in DataFrame
+    new_df = pd.DataFrame(entries)
+
+    # Controlla che le colonne coincidano
+    if list(new_df.columns) != list(df.columns):
+        raise ValueError(
+            f"Le colonne delle nuove entry non coincidono con quelle del CSV.\n"
+            f"CSV: {list(df.columns)}\n"
+            f"Entries: {list(new_df.columns)}"
+        )
+
+    # Aggiunge le nuove righe
+    df = pd.concat([df, new_df], ignore_index=True)
+
+    # Salva il CSV aggiornato (senza indice)
+    file_csv=u.get_dataset_dir() / file_csv
+    df.to_csv(file_csv, index=False)
+
+    print(f"Aggiunte {len(new_df)} nuove righe a '{file_csv}'.")
+    print(df.tail())
+
+    return df
+
+
+def delete_entries_flexible(file_csv: str, colonna: str, valore: str, n_da_eliminare: int = None) -> pd.DataFrame:
+    """
+    Elimina le righe che corrispondono a un determinato valore in una colonna scelta.
+
+    Se 'n_da_eliminare' NON viene specificato, cancella TUTTE le righe corrispondenti.
+    Se 'n_da_eliminare' viene specificato, ne cancella solo quel numero a caso.
+
+    Args:
+        file_csv: Nome o percorso del file CSV (es. "merged.csv").
+        colonna: La colonna su cui filtrare (es. "class", "width", "ymin").
+        valore: Il valore da cercare (es. "obligation", 400).
+        n_da_eliminare: (Opzionale) Quante righe cancellare a caso. Di default è None (elimina tutto).
+    """
+    # 1. Carica il file CSV
+    file_csv_path = pathlib.Path(file_csv)
+    if not file_csv_path.is_absolute():
+        file_csv_path = u.get_dataset_dir() / file_csv
+
+    if not file_csv_path.exists():
+        raise FileNotFoundError(f"File non trovato: {file_csv_path}")
+
+    df = pd.read_csv(file_csv_path)
+
+    # 2. Trova gli indici di tutte le righe corrispondenti
+    indici_corrispondenti = df[df[colonna].astype(str).str.strip() == str(valore).strip()].index
+    totale_trovati = len(indici_corrispondenti)
+
+    if totale_trovati == 0:
+        print(f"Nessuna riga trovata con {colonna} = '{valore}'.")
+        return df
+
+    # 3. LOGICA DI ELIMINAZIONE
+    if n_da_eliminare is None:
+        # CASO 1: Elimina TUTTE le righe che corrispondono alla ricerca
+        df_aggiornato = df.drop(index=indici_corrispondenti).reset_index(drop=True)
+        print(f"Target '{colonna}' = '{valore}': Eliminate TUTTE le {totale_trovati} righe trovate.")
+    else:
+        # CASO 2: Elimina solo un TOT di righe in modo RANDOM
+        quantita_effettiva = min(n_da_eliminare, totale_trovati)
+
+        indici_da_eliminare = pd.Series(indici_corrispondenti).sample(
+            n=quantita_effettiva,
+            random_state=None
+        ).values
+
+        df_aggiornato = df.drop(index=indici_da_eliminare).reset_index(drop=True)
+        print(
+            f"Target '{colonna}' = '{valore}': Trovate {totale_trovati} righe. Cancellate {quantita_effettiva} a caso! 🎲")
+
+    # 4. Salva il file CSV aggiornato
+    df_aggiornato.to_csv(file_csv_path, index=False)
+    return df_aggiornato
 
 
 # ==========================================
 # Test
 # ==========================================
 if __name__ == "__main__":
-    image_preprocessing_csv()
+    m=merge_csv_files("merged.csv", True)
+    filter_and_replace_csv("trafficlight",m)
+    delete_entries_flexible("merged.csv", colonna="class", valore="crosswalk", n_da_eliminare= 20)
+
+
+
