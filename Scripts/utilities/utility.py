@@ -50,7 +50,7 @@ def view_csv(zip_path: str) -> None:
         with zipfile.ZipFile(resolved, "r") as archive:
             file_list = archive.namelist()
             df = pd.DataFrame()
-            df = find_csv_files(df, archive, file_list)
+            find_csv_files()
 
     # ← Il try ora è FUORI da if/else, viene sempre eseguito
     try:
