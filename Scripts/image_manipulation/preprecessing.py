@@ -15,6 +15,7 @@ from Scripts.utilities import utility as u
     di profondità e dove il nome di un file è il suo path completo con il file zip alla radice .
 """
 
+entries=[{}]
 
 # Variabile GLOBALE, lista di pandas.DataFrame
 csv_list = list[pd.DataFrame]()
@@ -345,6 +346,15 @@ def merge_label( df: pd.DataFrame) -> pd.DataFrame:
     df_unificato = df.copy()
     df_unificato['class'] = df_unificato['class'].replace(dizionario_etichette)
     return df_unificato
+
+
+def filter_and_replace_csv(csv_label_class, df: pd.DataFrame) -> pd.DataFrame:
+    global entries
+
+    if csv_label_class not in df['class'].values:
+        print(f"Warning: la classe '{csv_label_class}' non è presente in questo DataFrame.")
+
+    df_filtrato = df[df['class'] != csv_label_class]
 
 
 # ==========================================
