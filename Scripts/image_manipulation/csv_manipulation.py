@@ -346,7 +346,7 @@ def merge_label( df: pd.DataFrame) -> pd.DataFrame:
     df_unificato['class'] = df_unificato['class'].replace(dizionario_etichette)
     return df_unificato
 
-def add_entries(file_csv, entries: list) -> pd.DataFrame:
+def add_entries(file_csv, entries: list, ) -> pd.DataFrame:
     """
     Aggiunge nuove righe ad un file CSV.
 
@@ -401,39 +401,68 @@ def add_entries(file_csv, entries: list) -> pd.DataFrame:
 
     return df
 
+def delete_entries(file_csv, entries: list) -> pd.DataFrame:
+    """
+    Elimina tutte le righe relative alle immagini specificate.
+    Tutti gli altri campi verrano ignorati.
+    Args:
+        file_csv: percorso del file CSV oppure solo il suo nome.
+        entries: lista di dizionari contenenti almeno la chiave "filename".
+
+    Returns:
+        pd.DataFrame: il DataFrame aggiornato.
+    """
+
+    # Se viene passato solo il nome del file, cercalo nella cartella Dataset
+    file_csv = pathlib.Path(file_csv)
+    if not file_csv.is_absolute():
+        file_csv = u.get_dataset_dir() / file_csv
+
+    # Controlla che il file esista
+    if not file_csv.exists():
+        raise FileNotFoundError(f"File non trovato: {file_csv}")
+
+    # Legge il CSV
+    df = pd.read_csv(file_csv)
+
+    # Elimina l'eventuale colonna degli indici
+    if "Unnamed: 0" in df.columns:
+        df = df.drop(columns=["Unnamed: 0"])
+
+    if not entries:
+        print("Nessuna entry da eliminare.")
+        return df
+
+    # Estrae i nomi dei file
+    filenames = [entry["filename"] for entry in entries]
+
+    # Conta quante righe verranno eliminate
+    num_deleted = df["filename"].isin(filenames).sum()
+
+    if num_deleted == 0:
+        print("Nessuna immagine trovata.")
+        return df
+
+    # Elimina le righe
+    df = df[~df["filename"].isin(filenames)]
+
+    # Salva il CSV aggiornato
+    df.to_csv(file_csv, index=False)
+
+    print(f"Eliminate {num_deleted} righe.")
+    print(df.tail())
+
+    return df
+
 entries = [
     {
         "filename": "prova5.png",
-        "class": "trafficlight",
-        "xmin": 98,
-        "ymin": 62,
-        "xmax": 208,
-        "ymax": 232,
-        "width": 267,
-        "height": 400,
-        "depth": 3.0
-    },
-    {
-        "filename": "prova6.png",
-        "class": "trafficlight",
-        "xmin": 98,
-        "ymin": 62,
-        "xmax": 208,
-        "ymax": 232,
-        "width": 267,
-        "height": 400,
-        "depth": 3.0
     }
 
 ]
-
-
 
 # ==========================================
 # Test
 # ==========================================
 if __name__ == "__main__":
-    add_entries("merged.csv", entries)
-
-
-
+    delete_entries("merged.csv", entries)

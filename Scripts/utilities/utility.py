@@ -14,7 +14,7 @@ def get_dataset_dir() -> pathlib.Path:
             Dataset/
             Scripts/
                 image_manipulation/
-                    preprecessing.py <<<
+                    csv_manipulation.py <<<
 
     Returns:
         pathlib.Path: il path delle cartelle Dataset.
