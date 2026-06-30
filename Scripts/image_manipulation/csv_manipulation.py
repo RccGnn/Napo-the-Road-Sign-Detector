@@ -429,54 +429,59 @@ def add_entries(df:pd.DataFrame,file_csv:str,file_entries:str) -> pd.DataFrame:
 
     return df
 
-def delete_entries(df:pd.DataFrame, file_csv:str ) -> pd.DataFrame:
+
+def delete_entries_flexible(file_csv: str, colonna: str, valore: str, n_da_eliminare: int = None) -> pd.DataFrame:
     """
-    Elimina tutte le righe relative alle immagini specificate.
-    Tutti gli altri campi verrano ignorati.
+    Elimina le righe che corrispondono a un determinato valore in una colonna scelta.
+
+    Se 'n_da_eliminare' NON viene specificato, cancella TUTTE le righe corrispondenti.
+    Se 'n_da_eliminare' viene specificato, ne cancella solo quel numero a caso.
+
     Args:
-        file_csv: percorso del file CSV oppure solo il suo nome.
-        entries: lista di dizionari contenenti almeno la chiave "filename".
-
-    Returns:
-        pd.DataFrame: il DataFrame aggiornato.
+        file_csv: Nome o percorso del file CSV (es. "merged.csv").
+        colonna: La colonna su cui filtrare (es. "class", "width", "ymin").
+        valore: Il valore da cercare (es. "obligation", 400).
+        n_da_eliminare: (Opzionale) Quante righe cancellare a caso. Di default è None (elimina tutto).
     """
+    # 1. Carica il file CSV
+    file_csv_path = pathlib.Path(file_csv)
+    if not file_csv_path.is_absolute():
+        file_csv_path = u.get_dataset_dir() / file_csv
 
-    # Se viene passato solo il nome del file, cercalo nella cartella Dataset
-    file_csv = pathlib.Path(file_csv)
-    if not file_csv.is_absolute():
-        file_csv = u.get_dataset_dir() / file_csv
+    if not file_csv_path.exists():
+        raise FileNotFoundError(f"File non trovato: {file_csv_path}")
 
-    # Controlla che il file esista
-    if not file_csv.exists():
-        raise FileNotFoundError(f"File non trovato: {file_csv}")
+    df = pd.read_csv(file_csv_path)
 
-    # Legge il CSV
-    df = pd.read_csv(file_csv)
+    # 2. Trova gli indici di tutte le righe corrispondenti
+    indici_corrispondenti = df[df[colonna].astype(str).str.strip() == str(valore).strip()].index
+    totale_trovati = len(indici_corrispondenti)
 
-    if not entries:
-        print("Nessuna entry da eliminare.")
+    if totale_trovati == 0:
+        print(f"Nessuna riga trovata con {colonna} = '{valore}'.")
         return df
 
-    # Estrae i nomi dei file
-    filenames = [entry["filename"] for entry in entries]
+    # 3. LOGICA DI ELIMINAZIONE
+    if n_da_eliminare is None:
+        # CASO 1: Elimina TUTTE le righe che corrispondono alla ricerca
+        df_aggiornato = df.drop(index=indici_corrispondenti).reset_index(drop=True)
+        print(f"Target '{colonna}' = '{valore}': Eliminate TUTTE le {totale_trovati} righe trovate.")
+    else:
+        # CASO 2: Elimina solo un TOT di righe in modo RANDOM
+        quantita_effettiva = min(n_da_eliminare, totale_trovati)
 
-    # Conta quante righe verranno eliminate
-    num_deleted = df["filename"].isin(filenames).sum()
+        indici_da_eliminare = pd.Series(indici_corrispondenti).sample(
+            n=quantita_effettiva,
+            random_state=None
+        ).values
 
-    if num_deleted == 0:
-        print("Nessuna immagine trovata.")
-        return df
+        df_aggiornato = df.drop(index=indici_da_eliminare).reset_index(drop=True)
+        print(
+            f"Target '{colonna}' = '{valore}': Trovate {totale_trovati} righe. Cancellate {quantita_effettiva} a caso! 🎲")
 
-    # Elimina le righe
-    df = df[~df["filename"].isin(filenames)]
-
-    # Salva il CSV aggiornato
-    df.to_csv(file_csv, index=False)
-
-    print(f"Eliminate {num_deleted} righe.")
-    print(df.tail())
-
-    return df
+    # 4. Salva il file CSV aggiornato
+    df_aggiornato.to_csv(file_csv_path, index=False)
+    return df_aggiornato
 
 
 # ==========================================
@@ -485,6 +490,7 @@ def delete_entries(df:pd.DataFrame, file_csv:str ) -> pd.DataFrame:
 if __name__ == "__main__":
     m=merge_csv_files("merged.csv", True)
     filter_and_replace_csv("trafficlight",m)
+    delete_entries_flexible("merged.csv", colonna="class", valore="crosswalk", n_da_eliminare= 20)
 
 
 
