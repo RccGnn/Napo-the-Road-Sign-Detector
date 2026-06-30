@@ -1,8 +1,6 @@
 import io
 import os
 import shutil
-from typing import Never
-
 import pandas as pd
 import pathlib
 """
@@ -12,10 +10,14 @@ import pathlib
 """
 import zipfile
 from PIL import Image
+import xml.etree.ElementTree as Et
+
+from Scripts.utilities import utility as u
 
 # Variabile GLOBALE, lista di pandas.DataFrame
 csv_list = list[pd.DataFrame]()
 
+<<<<<<<< HEAD:Scripts/image_manipulation/Csv_manipulation.py
 def get_dataset_dir() -> pathlib.Path:
     """
     Restituisce il percorso assoluto di un file nella cartella Dataset.
@@ -42,6 +44,8 @@ def get_dataset_dir() -> pathlib.Path:
     # Lancia errore
     raise FileNotFoundError("Cartella 'Dataset' non trovata.")
 
+========
+>>>>>>>> 7a6438bc32cd4a927605da85bc0c3a0e6a3a46e0:Scripts/image_manipulation/preprecessing.py
 def find_csv_files() -> None:
     """
         Cerca il primo file CSV all'interno di un archivio ZIP e lo legge in un DataFrame,
@@ -53,7 +57,7 @@ def find_csv_files() -> None:
     """
 
     # Recupera il percorso della cartella Dataset e trasformalo in assoluto (con '.resolve')
-    dataset_path = get_dataset_dir().resolve()
+    dataset_path = u.get_dataset_dir().resolve()
     global csv_list
 
     # Usa .glob("*.zip") per ciclare solo sui file con estensione .zip
@@ -96,7 +100,7 @@ def xml_to_csv(archive: zipfile.ZipFile, output_csv="annotations.csv") -> None:
     """
 
     # Crea un file .csv con il nella cartella Dataset con il nome output_csv
-    resolved_csv = get_dataset_dir() / output_csv
+    resolved_csv = u.get_dataset_dir() / output_csv
 
     rows = []
     file_list = archive.namelist()
@@ -132,8 +136,10 @@ def xml_to_csv(archive: zipfile.ZipFile, output_csv="annotations.csv") -> None:
             # Nel tag object di xml è conservato il nome della classe a cui appartiene l'oggetto e il boundbox
             # Nel tag size di xml sono conservate le misure originali dell'immagine
 
+            # Il tag size è univoco per ogni immagine
             size = root.find("size")
 
+            # Invece, possono essere presenti anche più tag object (più ritagli per una foto)
             for obj in root.findall("object"):
                 class_tag = obj.find("name")
                 class_name = class_tag.text.strip() if class_tag is not None else ""
@@ -163,13 +169,15 @@ def xml_to_csv(archive: zipfile.ZipFile, output_csv="annotations.csv") -> None:
     csv_list.append(df)
 
 
-def image_preprocessing_csv(output_folder="pre-processed_images", delete_previous=False, max_iter=-1) -> None:
+def image_preprocessing_csv(output_folder="preprocessed_images", delete_previous=False, max_iter=-1) -> None:
     """
-        Estrae immagini da un archivio ZIP, le ritaglia in base ai bounding box.
+        Estrae tutte le immagini contenute in file zip nella cartella Dataset, le ritaglia in base ai bounding box
+        e le memorizza in una cartella output_folder nella cartella Dataset assieme a un file csv contenente le
+        informazioni di tutte le immagini ritagliate.
 
         Args:
             output_folder: Il percorso della cartella in cui verranno salvate le immagini
-                ritagliate. Di default è "pre-processed_images".
+                ritagliate. Di default è "preprocessed_images".
             delete_previous: Se impostato a True, elimina la cartella `output_folder`
                 (se già esistente) e tutto il suo contenuto. Di default è False.
             max_iter: Il numero massimo di file da processare (principalmente per il testing)
@@ -179,10 +187,10 @@ def image_preprocessing_csv(output_folder="pre-processed_images", delete_previou
     """
 
     # Recupera il percorso della cartella Dataset e trasformalo in assoluto (con '.resolve')
-    dataset_path = get_dataset_dir().resolve()
+    dataset_path = u.get_dataset_dir().resolve()
 
     # Recupera anche output_folder rispetto a Dataset/ e non rispetto alla cwd
-    output_folder = get_dataset_dir() / output_folder
+    output_folder = u.get_dataset_dir() / output_folder
 
     # Elimina la cartella di nome output_folder se esiste e se 'delete_previous' = True
     if os.path.exists(output_folder) and delete_previous:
@@ -197,7 +205,7 @@ def image_preprocessing_csv(output_folder="pre-processed_images", delete_previou
     global csv_list
     find_csv_files()
 
-    # Crea il file csv completo e mettilo nella cartella pre-processed_images
+    # Crea il file csv completo e mettilo nella cartella preprocessed_images
     merge_csv_files(output_folder / "merged.csv")
 
     # Se non sono stati trovati csv, termina
@@ -239,10 +247,12 @@ def image_preprocessing_csv(output_folder="pre-processed_images", delete_previou
 
                     # Recupera tutte le righe relative a un jpeg
                     for df in csv_list:
+                        # Un'immagine appartiene ad un solo csv
                         res = df.query(f"filename == '{os.path.basename(file_path)}'")
                         if not res.empty:
                             break
 
+                    # CROP delle immagini
                     if not res.empty:
                         # Itera su tutte le righe trovate per quella specifica immagine
                         for index, row in res.iterrows():
@@ -275,54 +285,6 @@ def image_preprocessing_csv(output_folder="pre-processed_images", delete_previou
     else:
         print(f"Salvate {counter} immagini! 😱")
 
-
-import xml.etree.ElementTree as Et
-def view_csv(zip_path: str) -> None:
-    """
-    Visualizza il csw tramite pandas
-    Args:
-        zip_path: Nome del dataset zippato, cioè [nome_dataset.zip]
-    Returns:
-        None: visualizza a schermo il dataset
-    """
-    # Risolve zip_path rispetto a Dataset/ e non rispetto alla cwd
-    resolved = get_dataset_dir() / zip_path
-
-    if resolved.suffix == ".csv":
-        df = pd.read_csv(resolved)
-    else:
-        with zipfile.ZipFile(resolved, "r") as archive:
-            file_list = archive.namelist()
-            df = pd.DataFrame()
-            df = find_csv_files(df, archive, file_list)
-
-    # ← Il try ora è FUORI da if/else, viene sempre eseguito
-    try:
-        pd.set_option('display.max_columns', None)
-        pd.set_option('display.width', 1000)
-        pd.set_option('display.max_rows', 50)
-
-        print("\n--- ANTEPRIMA DEL DATASET ---")
-        print(df)
-
-        print("\n--- INFORMAZIONI SUL DATASET ---")
-        print(f"Totale righe: {len(df)}")
-
-        print(f"Righe con class NaN: {df['class'].isna().sum()}")
-
-        conteggio = df['class'].value_counts(dropna=False)
-        print(f"Classi uniche trovate: {conteggio.index.tolist()}")
-
-        for classe, count in conteggio.items():
-            print(f"{classe}: {count}")
-
-        print(f"Totale: {len(df)} - Calcolati: {conteggio.sum()}\n")
-
-    except FileNotFoundError:
-        print(f"Errore: Il file '{zip_path}' non è stato trovato.")
-    except Exception as e:
-        print(f"Si è verificato un errore: {e}")
-
 def merge_csv_files(output_csv="merged.csv", exec_find_csv_files = False) -> pd.DataFrame:
     """
         Concatena tutti i DataFrame presenti nella lista globale 'csv_list' in un unico DataFrame
@@ -353,7 +315,7 @@ def merge_csv_files(output_csv="merged.csv", exec_find_csv_files = False) -> pd.
             return None
 
 
-    merged_csv = get_dataset_dir() / output_csv
+    merged_csv = u.get_dataset_dir() / output_csv
     # Concatena tutti i DataFrames nella lista
     merged_df = pd.concat(csv_list, ignore_index=True)
     merged_df = merge_label(merged_df)
@@ -380,16 +342,12 @@ def merge_label( df: pd.DataFrame) -> pd.DataFrame:
         }
 
     df_unificato = df.copy()
-
     df_unificato['class'] = df_unificato['class'].replace(dizionario_etichette)
-
     return df_unificato
 
 
-
+# ==========================================
 # Test
-find_csv_files()
-print(csv_list)
-m = merge_csv_files(exec_find_csv_files=True)
-view_csv("merged.csv")
-#image_preprocessing_csv()
+# ==========================================
+if __name__ == "__main__":
+    image_preprocessing_csv()
