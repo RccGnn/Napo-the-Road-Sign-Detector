@@ -3,7 +3,7 @@ import pathlib
 import zipfile
 import pandas as pd
 
-from Scripts.image_manipulation.preprecessing import find_csv_files
+from Scripts.image_manipulation.csv_manipulation import find_csv_files
 
 
 def get_dataset_dir() -> pathlib.Path:
@@ -14,7 +14,7 @@ def get_dataset_dir() -> pathlib.Path:
             Dataset/
             Scripts/
                 image_manipulation/
-                    csv_manipulation.py <<<
+                    preprecessing.py <<<
 
     Returns:
         pathlib.Path: il path delle cartelle Dataset.
@@ -50,7 +50,7 @@ def view_csv(zip_path: str) -> None:
         with zipfile.ZipFile(resolved, "r") as archive:
             file_list = archive.namelist()
             df = pd.DataFrame()
-            df = find_csv_files(df, archive, file_list)
+            find_csv_files()
 
     # ← Il try ora è FUORI da if/else, viene sempre eseguito
     try:

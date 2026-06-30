@@ -71,67 +71,6 @@ def carica_entries(file):
 
     print(f"Caricate con successo {len(entries)} entries dal file {file} di testo.")
 
-def get_dataset_dir() -> pathlib.Path:
-    """
-    Restituisce il percorso assoluto di un file nella cartella Dataset.
-    SI ASSUME CHE IL PROGETTO ABBIA LA SEGUENTE STRUTTURA:
-        <Napo-the-Road-Sign-Detector>/
-            Dataset/
-            Scripts/
-                image_manipulation/
-                    Csv_manipulation.py <<<
-
-    Returns:
-        pathlib.Path: il path delle cartelle Dataset.
-    """
-    # __file__ è il path assoluto dello script in esecuzione
-    this_file = pathlib.Path(__file__).resolve()
-
-    # Risali le cartelle per costruire il path della cartella 'Dataset'
-    for parent in this_file.parents:
-        # Verifica se /Dataset è una cartella nel path
-        dataset_dir = parent / "Dataset"
-        if os.path.isdir(dataset_dir):
-            return dataset_dir
-
-    # Lancia errore
-    raise FileNotFoundError("Cartella 'Dataset' non trovata.")
-
-
-def find_csv_files() -> None:
-    """
-        Cerca il primo file CSV all'interno di un archivio ZIP e lo legge in un DataFrame,
-        caricandolo tramite pandas.
-
-        Returns:
-            None: Come effetto collaterale vengono aggiunti nella lista globale csv_list i
-            DataFrame contenente i dati letti dal file CSV.
-    """
-
-    # Recupera il percorso della cartella Dataset e trasformalo in assoluto (con '.resolve')
-    dataset_path = u.get_dataset_dir().resolve()
-    global csv_list
-
-    # Usa .glob("*.zip") per ciclare solo sui file con estensione .zip
-    for zip_path in dataset_path.glob("*.zip"):
-
-        # Esplora il file zip (come se fosse una cartella normale, evitando la decompressione)
-        with (zipfile.ZipFile(zip_path, "r") as archive):
-
-            if "xml" in str(zip_path):
-                # Per gli archivi di dataset che hanno annotazioni sottoforma di XML pascal
-                xml_to_csv(archive)
-            else:
-                file_list = archive.namelist()
-                for file_path in file_list:
-
-                    # Scegli solo i file in train
-                    root, ext = os.path.splitext(file_path)
-                    if ext == ".csv" and "train" in root:
-                        df = pd.read_csv(archive.open(file_path))
-                        csv_list.append(df)
-                        break
-
 
 def xml_to_csv(archive: zipfile.ZipFile, output_csv="annotations.csv") -> None:
     """
@@ -337,6 +276,41 @@ def image_preprocessing_csv(output_folder="preprocessed_images", delete_previous
     else:
         print(f"Salvate {counter} immagini! 😱")
 
+def find_csv_files() -> None:
+    """
+        Cerca il primo file CSV all'interno di un archivio ZIP e lo legge in un DataFrame,
+        caricandolo tramite pandas.
+
+        Returns:
+            None: Come effetto collaterale vengono aggiunti nella lista globale csv_list i
+            DataFrame contenente i dati letti dal file CSV.
+    """
+
+    # Recupera il percorso della cartella Dataset e trasformalo in assoluto (con '.resolve')
+    dataset_path = u.get_dataset_dir().resolve()
+    global csv_list
+
+    # Usa .glob(".zip") per ciclare solo sui file con estensione .zip
+    for zip_path in dataset_path.glob("*.zip"):
+
+        # Esplora il file zip (come se fosse una cartella normale, evitando la decompressione)
+        with (zipfile.ZipFile(zip_path, "r") as archive):
+
+            if "xml" in str(zip_path):
+                # Per gli archivi di dataset che hanno annotazioni sottoforma di XML pascal
+                xml_to_csv(archive)
+            else:
+                file_list = archive.namelist()
+                for file_path in file_list:
+
+                    # Scegli solo i file in train
+                    root, ext = os.path.splitext(file_path)
+                    if ext == ".csv" and "train" in root:
+                        df = pd.read_csv(archive.open(file_path))
+                        csv_list.append(df)
+                        break
+
+
 def merge_csv_files(output_csv="merged.csv", exec_find_csv_files = False) -> pd.DataFrame:
     """
         Concatena tutti i DataFrame presenti nella lista globale 'csv_list' in un unico DataFrame
@@ -386,7 +360,7 @@ def merge_label( df: pd.DataFrame) -> pd.DataFrame:
         "left" : "obligation",
         "straight": "obligation",
         "up": "slope" ,
-        "down": "slop",
+        "down": "slope",
         "Speed Limit -100-" : "speedlimit",
         "Speed Limit -60-" : "speedlimit",
         "Speed Limit -70-" : "speedlimit",
@@ -397,6 +371,21 @@ def merge_label( df: pd.DataFrame) -> pd.DataFrame:
     df_unificato = df.copy()
     df_unificato['class'] = df_unificato['class'].replace(dizionario_etichette)
     return df_unificato
+
+def filter_and_replace_csv(csv_label_class, df: pd.DataFrame) -> pd.DataFrame:
+    global entries
+
+    if csv_label_class not in df['class'].values:
+        print(f"Warning: la classe '{csv_label_class}' non è presente in questo DataFrame.")
+
+    df_filtrato = df[df['class'] != csv_label_class]
+    print(df_filtrato.head())
+    print("dopo filtro")
+    add_entries(df_filtrato,"merged.csv" ,"entries.txt")
+
+
+    return df_filtrato
+
 
 def add_entries(df:pd.DataFrame,file_csv:str,file_entries:str) -> pd.DataFrame:
     """
@@ -440,7 +429,7 @@ def add_entries(df:pd.DataFrame,file_csv:str,file_entries:str) -> pd.DataFrame:
 
     return df
 
-def delete_entries(file_csv, entries: list) -> pd.DataFrame:
+def delete_entries(df:pd.DataFrame, file_csv:str ) -> pd.DataFrame:
     """
     Elimina tutte le righe relative alle immagini specificate.
     Tutti gli altri campi verrano ignorati.
@@ -463,10 +452,6 @@ def delete_entries(file_csv, entries: list) -> pd.DataFrame:
 
     # Legge il CSV
     df = pd.read_csv(file_csv)
-
-    # Elimina l'eventuale colonna degli indici
-    if "Unnamed: 0" in df.columns:
-        df = df.drop(columns=["Unnamed: 0"])
 
     if not entries:
         print("Nessuna entry da eliminare.")
@@ -492,22 +477,6 @@ def delete_entries(file_csv, entries: list) -> pd.DataFrame:
     print(df.tail())
 
     return df
-
-
-
-def filter_and_replace_csv(csv_label_class, df: pd.DataFrame) -> pd.DataFrame:
-    global entries
-
-    if csv_label_class not in df['class'].values:
-        print(f"Warning: la classe '{csv_label_class}' non è presente in questo DataFrame.")
-
-    df_filtrato = df[df['class'] != csv_label_class]
-    print(df_filtrato.head())
-    print("dopo filtro")
-    add_entries(df_filtrato,"merged.csv" ,"entries.txt")
-
-
-    return df_filtrato
 
 
 # ==========================================
