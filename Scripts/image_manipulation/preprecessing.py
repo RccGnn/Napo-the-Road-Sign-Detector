@@ -347,6 +347,88 @@ def merge_label( df: pd.DataFrame) -> pd.DataFrame:
     df_unificato['class'] = df_unificato['class'].replace(dizionario_etichette)
     return df_unificato
 
+def add_entries(file_csv, entries: list) -> pd.DataFrame:
+    """
+    Aggiunge nuove righe ad un file CSV.
+
+    Args:
+        file_csv: percorso del file CSV oppure solo il suo nome.
+        entries: lista di dizionari contenenti le nuove righe.
+
+    Returns:
+        pd.DataFrame: il DataFrame aggiornato.
+    """
+
+    # Se viene passato solo il nome del file, cercalo nella cartella Dataset
+    file_csv = pathlib.Path(file_csv)
+    if not file_csv.is_absolute():
+        file_csv = u.get_dataset_dir() / file_csv
+
+    # Controlla che il file esista
+    if not file_csv.exists():
+        raise FileNotFoundError(f"File non trovato: {file_csv}")
+
+    # Legge il CSV
+    df = pd.read_csv(file_csv)
+
+    # Elimina l'eventuale colonna degli indici
+    if "Unnamed: 0" in df.columns:
+        df = df.drop(columns=["Unnamed: 0"])
+
+    # Nessuna entry da aggiungere
+    if not entries:
+        print("Nessuna entry da aggiungere.")
+        return df
+
+    # Converte le nuove righe in DataFrame
+    new_df = pd.DataFrame(entries)
+
+    # Controlla che le colonne coincidano
+    if list(new_df.columns) != list(df.columns):
+        raise ValueError(
+            f"Le colonne delle nuove entry non coincidono con quelle del CSV.\n"
+            f"CSV: {list(df.columns)}\n"
+            f"Entries: {list(new_df.columns)}"
+        )
+
+    # Aggiunge le nuove righe
+    df = pd.concat([df, new_df], ignore_index=True)
+
+    # Salva il CSV aggiornato (senza indice)
+    df.to_csv(file_csv, index=False)
+
+    print(f"Aggiunte {len(new_df)} nuove righe a '{file_csv.name}'.")
+    print(df.tail())
+
+    return df
+
+entries = [
+    {
+        "filename": "prova5.png",
+        "class": "trafficlight",
+        "xmin": 98,
+        "ymin": 62,
+        "xmax": 208,
+        "ymax": 232,
+        "width": 267,
+        "height": 400,
+        "depth": 3.0
+    },
+    {
+        "filename": "prova6.png",
+        "class": "trafficlight",
+        "xmin": 98,
+        "ymin": 62,
+        "xmax": 208,
+        "ymax": 232,
+        "width": 267,
+        "height": 400,
+        "depth": 3.0
+    }
+
+]
+
+
 
 def filter_and_replace_csv(csv_label_class, df: pd.DataFrame) -> pd.DataFrame:
     global entries
@@ -361,4 +443,7 @@ def filter_and_replace_csv(csv_label_class, df: pd.DataFrame) -> pd.DataFrame:
 # Test
 # ==========================================
 if __name__ == "__main__":
-    merge_csv_files(output_csv="merged.csv", exec_find_csv_files=True)
+    add_entries("merged.csv", entries)
+
+
+
