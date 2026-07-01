@@ -1,10 +1,10 @@
 import random
-
 import pandas as pd
 from PIL import Image, ImageEnhance
 import numpy as np
 
 from Scripts.utilities import utility as u
+from Scripts.image_manipulation import csv_manipulation as cm
 
 def add_gaussian_noise(image: Image.Image, sigma: float = 25) -> Image.Image:
     """
@@ -15,8 +15,8 @@ def add_gaussian_noise(image: Image.Image, sigma: float = 25) -> Image.Image:
     e infine, riconverte il vettore di pixel (rumoroso) in immagine.
 
     Args:
-        image:  Immagine PIL di input.
-        sigma:  Deviziazione standard; esprime quanto i valori della distribuzione sono 'lontani' dalla media.
+        image: Immagine PIL di input.
+        sigma: Deviziazione standard; esprime quanto i valori della distribuzione sono 'lontani' dalla media.
 
             Nello specifico indica quanto un pixel è rumoroso rispetto al corrispettivo pixel della foto originiaria
             (i pixel rumorosi sono i valori della distribuzione ed i pixel della foto rappresentano la media).
@@ -77,45 +77,43 @@ def augment_images(angle=15, brightness_range=(0.5, 1.5), modifiers=(True, True,
         modifiers[3] = False
 
     dataset_dir = u.get_dataset_dir()
-    input_path = dataset_dir / "preprocessed_images"
-
-    output_path = dataset_dir / "augmented_images"
-    # Crea cartella di output dove parents=true nel caso in cui la cartella padre ('Dataset') non sia presente
-    output_path.mkdir(parents=True, exist_ok=True)
+    images_path = dataset_dir / "preprocessed_images"
 
     # Leggo il csv delle immagini 'merged.csv'
-    df = pd.DataFrame()
-    for file_path in input_path.iterdir():
+    df, csv_file = pd.DataFrame(), ""
+    for file_path in images_path.iterdir():
         if str.lower(file_path.suffix) == ".csv":
+            csv_file = file_path.name
             df = pd.read_csv(file_path)
+            break
 
     if df is None:
         print("❌ Error: Nessun file CSV trovato nella cartella preprocessed_images!")
-        return
+        return None
 
     new_rows = []
 
     counter = 0
     # Itera tutti i file nella cartella delle immagini
-    for file_path in input_path.iterdir():
+    for file_path in images_path.iterdir():
 
         # Ricava la riga corrispondente all'immagine considerata
-        nome_file_originale = file_path.name
-        riga_info = df[df['filename'] == nome_file_originale]
+        cropped_file_name = file_path.name.split("cropped")[0]
+        row_info = df[df['filename'].str.contains(cropped_file_name, na=False, regex=False)]
         # Se non si trova l'entrata, scarta
-        if riga_info.empty:
-            print(f" Warning: {nome_file_originale} non trovato nel CSV -> Saltato.")
+        if row_info.empty:
+            print(f" Warning: {cropped_file_name} non trovato nel CSV -> Saltato.")
             continue
 
         # Estrai i dati dell'immagine originale non modificata
-        info = riga_info.iloc[0].to_dict()
+        info = row_info.iloc[0].to_dict()
 
         # Scorporiamo i dati per facilità di manipolazione
         orig_class = info.get('class')
         xmin, ymin = info.get('xmin'), info.get('ymin')
         xmax, ymax = info.get('xmax'), info.get('ymax')
         width, height = info.get('width'), info.get('height')
-        depth = info.get('depth', 3)  # default a 3 se non presente
+        depth = info.get('depth', 3.0)  # default a 3 se non presente
 
         try:
             with Image.open(file_path) as img:
@@ -126,7 +124,7 @@ def augment_images(angle=15, brightness_range=(0.5, 1.5), modifiers=(True, True,
                     # 1. Inclina immagine in senso orario
                     # expand=True evita che i bordi vengano tagliati a causa della rotazione
                     img_angled_cw = img.rotate(-angle, expand=True)
-                    temp = output_path / f"{base_name}_angled_cw.png"
+                    temp = images_path / f"{base_name}_angled_cw.png"
                     img_angled_cw.save(temp)
                     # Aggiungi l'entrata alle righe
                     new_rows.append({
@@ -138,7 +136,7 @@ def augment_images(angle=15, brightness_range=(0.5, 1.5), modifiers=(True, True,
                 if modifiers[1]:
                     # 2. Inclina immagine in senso antiorario
                     img_angled_ccw = img.rotate(angle, expand=True)
-                    temp = output_path / f"{base_name}_angled_ccw.png"
+                    temp = images_path / f"{base_name}_angled_ccw.png"
                     img_angled_ccw.save(temp)
                     # Aggiungi l'entrata alle righe
                     new_rows.append({
@@ -150,10 +148,10 @@ def augment_images(angle=15, brightness_range=(0.5, 1.5), modifiers=(True, True,
                 if modifiers[2]:
                     # 3. Specchia l'immagine orizzontalmente
                     img_mirrored = img.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
-                    temp = output_path / f"{base_name}_mirrored.png"
+                    temp = images_path / f"{base_name}_mirrored.png"
                     img_mirrored.save(temp)
 
-                    # Con il ribaltamento orizzontale, xmin e xmax si invertono rispetto alla larghezza!
+                    # Con il ribaltamento orizzontale, xmin e xmax si invertono rispetto alla larghezza
                     new_xmin = width - xmax
                     new_xmax = width - xmin
                     # Aggiungi l'entrata alle righe
@@ -171,7 +169,7 @@ def augment_images(angle=15, brightness_range=(0.5, 1.5), modifiers=(True, True,
                         brightness_factor = random.uniform(brightness_range[0], brightness_range[1])
                     enhancer = ImageEnhance.Brightness(img)
                     img_brightness = enhancer.enhance(brightness_factor)
-                    temp = output_path / f"{base_name}_brightened_{brightness_factor:.2f}.png"
+                    temp = images_path / f"{base_name}_brightened_{brightness_factor:.2f}.png"
                     img_brightness.save(temp)
                     # Aggiungi l'entrata alle righe
                     new_rows.append({
@@ -183,7 +181,7 @@ def augment_images(angle=15, brightness_range=(0.5, 1.5), modifiers=(True, True,
                 if modifiers[4]:
                     # 5. Aggiunge rumore distribuito uniformemente all'immagine
                     img_noisy = add_gaussian_noise(img)
-                    temp = output_path / f"{base_name}_noisy.png"
+                    temp = images_path / f"{base_name}_noisy.png"
                     img_noisy.save(temp)
                     # Aggiungi l'entrata alle righe
                     new_rows.append({
@@ -192,20 +190,21 @@ def augment_images(angle=15, brightness_range=(0.5, 1.5), modifiers=(True, True,
                         "width": width, "height": height, "depth": depth
                     })
 
+                print(f"Aggiunte {len(modifiers)} modifiche dell'immagine '{file_path.name}'")
                 counter += 1
+                # if counter == 100:
+                #     break
         except Exception as e:
             print(f"❌ Errore: Modifiche all'immagine '{file_path.name}' non riuscite : {e}")
-
+    print(new_rows)
     # Se è stata salvata almeno una riga
-    if new_rows != []:
-        csv_output_path = output_path / "merged.csv"
-        # Aggiungi le righe al file csv
-        #### Funzione di add_entries
-        # df_finale.to_csv(csv_output_path, index=False)
-        print(f"📊 File CSV aggiornato e salvato in: {csv_output_path}")
+    if new_rows:
+        df = cm.add_entries(df, csv_file, new_rows)
+        print(f"📊 File CSV aggiornato")
 
     # Per ogni foto sono create più mutazioni
     print(f"Create {counter * (len(modifiers)+1)} nuove immagini!")
+    return None
 
 
 # ==========================================
