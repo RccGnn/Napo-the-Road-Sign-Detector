@@ -270,11 +270,11 @@ def image_preprocessing_csv(output_folder="preprocessed_images", delete_previous
                                     counter += 1
 
     if counter < 5000 :
-        print(f"Salvate {counter} immagini! 😨")
+        print(f"Salvate {counter} immagini! ")
     elif 5000 <= counter < 10000:
-        print(f"Salvate {counter} immagini! 😰")
+        print(f"Salvate {counter} immagini! ")
     else:
-        print(f"Salvate {counter} immagini! 😱")
+        print(f"Salvate {counter} immagini! ")
 
 def find_csv_files() -> None:
     """
@@ -356,6 +356,7 @@ def merge_label( df: pd.DataFrame) -> pd.DataFrame:
         "stop": "Stop",
         "do_not_turn_l" : "do_not_turn" ,
         "do_not_turn_r" : "do_not_turn" ,
+        "no right": "do_not_turn" ,
         "no straight" : "do_not_turn",
         "left" : "obligation",
         "straight": "obligation",
@@ -366,6 +367,8 @@ def merge_label( df: pd.DataFrame) -> pd.DataFrame:
         "Speed Limit -70-" : "speedlimit",
         "Speed Limit -80-" : "speedlimit",
         "Speed Limit 30"   : "speedlimit",
+        "green": "green_traffic_light",
+        "red" : "red_traffic_light",
     }
 
     df_unificato = df.copy()
@@ -477,7 +480,7 @@ def delete_entries_flexible(file_csv: str, colonna: str, valore: str, n_da_elimi
 
         df_aggiornato = df.drop(index=indici_da_eliminare).reset_index(drop=True)
         print(
-            f"Target '{colonna}' = '{valore}': Trovate {totale_trovati} righe. Cancellate {quantita_effettiva} a caso! 🎲")
+            f"Target '{colonna}' = '{valore}': Trovate {totale_trovati} righe. Cancellate {quantita_effettiva} a caso! ")
 
     # 4. Salva il file CSV aggiornato
     df_aggiornato.to_csv(file_csv_path, index=False)
@@ -490,7 +493,10 @@ def delete_entries_flexible(file_csv: str, colonna: str, valore: str, n_da_elimi
 if __name__ == "__main__":
     m=merge_csv_files("merged.csv", True)
     filter_and_replace_csv("trafficlight",m)
-    delete_entries_flexible("merged.csv", colonna="class", valore="crosswalk", n_da_eliminare= 20)
-
+    delete_entries_flexible("merged.csv", colonna="class", valore="speedlimit", n_da_eliminare= 500)
+    delete_entries_flexible("merged.csv", colonna="class", valore="green_traffic_light", n_da_eliminare= 1100)
+    delete_entries_flexible("merged.csv", colonna="class", valore="obligation", n_da_eliminare=500)
+    delete_entries_flexible("merged.csv", colonna="class", valore="do_not_turn", n_da_eliminare=600)
+    delete_entries_flexible("merged.csv", colonna="class", valore="slope", n_da_eliminare=600)
 
 

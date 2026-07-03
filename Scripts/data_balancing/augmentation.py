@@ -88,7 +88,7 @@ def augment_images(angle=15, brightness_range=(0.5, 1.5), modifiers=(True, True,
             break
 
     if df is None:
-        print("❌ Error: Nessun file CSV trovato nella cartella preprocessed_images!")
+        print(" Error: Nessun file CSV trovato nella cartella preprocessed_images!")
         return None
 
     new_rows = []
@@ -195,12 +195,12 @@ def augment_images(angle=15, brightness_range=(0.5, 1.5), modifiers=(True, True,
                 # if counter == 100:
                 #     break
         except Exception as e:
-            print(f"❌ Errore: Modifiche all'immagine '{file_path.name}' non riuscite : {e}")
+            print(f"Errore: Modifiche all'immagine '{file_path.name}' non riuscite : {e}")
     print(new_rows)
     # Se è stata salvata almeno una riga
     if new_rows:
         df = cm.add_entries(df, csv_file, new_rows)
-        print(f"📊 File CSV aggiornato")
+        print(f"File CSV aggiornato")
 
     # Per ogni foto sono create più mutazioni
     print(f"Create {counter * (len(modifiers)+1)} nuove immagini!")
