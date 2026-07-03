@@ -7,8 +7,8 @@ import zipfile
 from PIL import Image
 import xml.etree.ElementTree as Et
 import csv
-
-from fontTools.ttLib.tables.grUtils import entries
+from tqdm import tqdm
+from pathlib import PurePosixPath
 
 from Scripts.utilities import utility as u
 
@@ -21,7 +21,7 @@ from Scripts.utilities import utility as u
 entries=[]
 
 # Variabile GLOBALE, lista di pandas.DataFrame
-csv_list = list[pd.DataFrame]()
+csv_list_df = list[pd.DataFrame]()
 
 
 def carica_entries(file):
@@ -104,7 +104,7 @@ def xml_to_csv(archive: zipfile.ZipFile, output_csv="annotations.csv") -> None:
     ]
 
     print(f"Trovati {len(xml_files)} file XML.")
-    global csv_list
+    global csv_list_df
 
     for xml_path in xml_files:
         try:
@@ -157,124 +157,138 @@ def xml_to_csv(archive: zipfile.ZipFile, output_csv="annotations.csv") -> None:
     df = pd.DataFrame(rows, columns=["filename", "class",  "xmin", "ymin", "xmax", "ymax", "width", "height", "depth",])
     df.to_csv(resolved_csv, index=False)
     print(f"✅ - Trovati {len(rows)} bounding boxes da {len(xml_files)} file XML → '{resolved_csv}'")
-    csv_list.append(df)
+    csv_list_df.append(df)
 
 
-def image_preprocessing_csv(output_folder="preprocessed_images", delete_previous=False, max_iter=-1) -> None:
+def image_preprocessing_csv(
+        merged_df: pd.DataFrame,
+        output_folder: str = "preprocessed_images",
+        delete_previous: bool = False,
+        max_iter: int = -1,
+        verbose: bool = False,
+) -> list[str]:
     """
-        Estrae tutte le immagini contenute in file zip nella cartella Dataset, le ritaglia in base ai bounding box
-        e le memorizza in una cartella output_folder nella cartella Dataset assieme a un file csv contenente le
-        informazioni di tutte le immagini ritagliate.
+    Estrae le immagini elencate in `merged_df` dai file zip presenti nella cartella Dataset,
+    le ritaglia in base ai rispettivi bounding box e le salva in `output_folder` (dentro Dataset).
 
-        Args:
-            output_folder: Il percorso della cartella in cui verranno salvate le immagini
-                ritagliate. Di default è "preprocessed_images".
-            delete_previous: Se impostato a True, elimina la cartella `output_folder`
-                (se già esistente) e tutto il suo contenuto. Di default è False.
-            max_iter: Il numero massimo di file da processare (principalmente per il testing)
-                Se impostato a un numero negativo, processa tutti i file. Di default è -1.
-        Returns:
-            None: La funzione non restituisce alcun valore. Ha come side-effect la creazione di una cartella d'immagini.
+    Args:
+        merged_df: DataFrame con colonne 'filename', 'xmin', 'ymin', 'xmax', 'ymax'
+            (rinomina gli attributi usati sotto se le tue colonne hanno nomi diversi,
+            es. 'x'/'y'/'width'/'height'). Solo le immagini presenti qui vengono processate.
+            Più righe con lo stesso filename indicano più bounding box (oggetti diversi)
+            nella stessa immagine sorgente.
+        output_folder: Cartella di destinazione dentro Dataset. Default "preprocessed_images".
+        delete_previous: Se True, elimina output_folder (se esiste) prima di ricrearla.
+        max_iter: Numero massimo di crop da salvare in totale (utile per test rapidi).
+            Se negativo, processa tutto. Default -1.
+            ATTENZIONE: se impostato, la lista dei "filename mancanti" restituita potrebbe
+            non essere affidabile, perché la scansione degli zip si ferma appena si
+            raggiunge il limite, prima di aver controllato tutti i file disponibili.
+        verbose: Se True, stampa un messaggio per ogni immagine salvata (più lento su
+            dataset grandi). Default False: viene mostrata solo una progress bar.
+
+    Returns:
+        List[str]: lista (ordinata) dei filename presenti in `merged_df` ma MAI trovati
+        in nessuno dei tre zip. Lista vuota se tutti i filename del csv sono stati trovati.
+        Side-effect: crea `output_folder` piena di immagini ritagliate.
     """
+    initial_len = len(merged_df)
+    merged_df = merged_df.drop_duplicates()
+    duplicates_removed = initial_len - len(merged_df)
+    if duplicates_removed > 0:
+        print(
+            f"⚠️ Rimosse {duplicates_removed} righe duplicate esatte dal csv (stesso filename + stesso bounding box).")
 
-    # Recupera il percorso della cartella Dataset e trasformalo in assoluto (con '.resolve')
     dataset_path = u.get_dataset_dir().resolve()
-
-    # Recupera anche output_folder rispetto a Dataset/ e non rispetto alla cwd
     output_folder = u.get_dataset_dir() / output_folder
 
-    # Elimina la cartella di nome output_folder se esiste e se 'delete_previous' = True
-    if os.path.exists(output_folder) and delete_previous:
-        # shutil = os.rmdir ma elimina anche gli elementi della cartella
+    if output_folder.exists() and delete_previous:
         shutil.rmtree(output_folder)
-        print(f"🧹 Eliminato la cartella: '{output_folder}'.")
+        print(f"🧹 Eliminata la cartella: '{output_folder}'.")
+    output_folder.mkdir(parents=True, exist_ok=True)
 
-    # Crea la cartella dove mettere le immagini modificate, se non esiste
-    os.makedirs(output_folder, exist_ok=True)
+    grouped = merged_df.groupby("filename")
 
-    # Salva e apri i file .csv di tutti i dataset, PRIMA di iniziare a iterare sui dataset
-    global csv_list
-    find_csv_files()
+    # Insieme dei filename ancora da trovare: appena si svuota (tutte le immagini
+    # richieste sono state estratte) si possono saltare gli zip rimanenti senza
+    # nemmeno aprirli — utile se il csv copre solo una parte dei file negli zip
+    # (es. dataset diviso in più archivi train/val/test).
+    remaining = set(grouped.groups.keys())
 
-    # Crea il file csv completo e mettilo nella cartella preprocessed_images
-    merge_csv_files(output_folder / "merged.csv")
-
-    # Se non sono stati trovati csv, termina
-    if len(csv_list) == 0:
-        print("Warning: nessun file csv trovato.")
-
-    # Se ogni csv letto è vuoto, termina
-    flag = False
-    for df in csv_list:
-        if not df.empty:
-            flag = True
-            break
-    if not flag:
-        print("Warning: nessuna annotazione trovata.")
-        return
-
+    total_target = len(merged_df) if max_iter < 0 else min(max_iter, len(merged_df))
     counter = 0
-    # Usa .glob("*.zip") per ciclare solo sui file con estensione .zip
-    for zip_path in dataset_path.glob("*.zip"):
 
-        # Esplora il file zip (come se fosse una cartella normale, evitando la decompressione)
-        with (zipfile.ZipFile(zip_path, "r") as archive):
-            file_list = archive.namelist()
+    zip_paths = sorted(dataset_path.glob("*.zip"))  # ordine deterministico
 
-            # File_path comprende tutti i file, anche cartelle o csv
-            for file_path in file_list:
+    with tqdm(total=total_target, desc="Ritaglio immagini", unit="img") as pbar:
+        for zip_path in zip_paths:
+            if not remaining or (0 <= max_iter <= counter):
+                break
 
-                # Interrompi le iterazioni se max_iter è un numero non negativo
-                # Evita questo controllo solo so max_iter è un numero negativo
-                if max_iter >= 0:
-                    if max_iter == 0:
+            with zipfile.ZipFile(zip_path, "r") as archive:
+                namelist = archive.namelist()
+
+                # Controlla UNA VOLTA per zip se esiste una cartella "train": se sì,
+                # ci si limita a quella; se no, si cerca in tutto lo zip come prima.
+                has_train_folder = any(
+                    any(part.lower() == "train" for part in PurePosixPath(fp).parent.parts)
+                    for fp in namelist
+                )
+
+                for file_path in namelist:
+                    if not remaining or (0 <= max_iter <= counter):
                         break
-                    max_iter -= 1
+                    if not file_path.lower().endswith((".jpeg", ".jpg", ".png")):
+                        continue
+                    if has_train_folder:
+                        parent_parts = PurePosixPath(file_path).parent.parts
+                        if not any(part.lower() == "train" for part in parent_parts):
+                            continue
+                    base_filename = os.path.basename(file_path)
+                    if base_filename not in remaining:
+                        continue
 
-                # Trova tutti i file JPEG o JPG o PNG
-                t = file_path.lower()
+                    rows = grouped.get_group(base_filename)
+                    base_name = os.path.splitext(base_filename)[0][:50]
 
-                if t.endswith((".jpeg", ".jpg", ".png")):
+                    with archive.open(file_path) as img_file:
+                        img_data = io.BytesIO(img_file.read())
+                        with Image.open(img_data) as img:
+                            # itertuples è molto più veloce di iterrows: niente
+                            # creazione di una Series per ogni riga/bounding box.
+                            for row in rows.itertuples(index=True):
+                                if 0 <= max_iter <= counter:
+                                    break
+                                xmin, ymin = int(row.xmin), int(row.ymin)
+                                xmax, ymax = int(row.xmax), int(row.ymax)
+                                cropped_img = img.crop((xmin, ymin, xmax, ymax))
+                                new_filename = f"{base_name}cropped{row.Index}.png"
+                                cropped_img.save(output_folder / new_filename)
 
-                    # Recupera tutte le righe relative a un jpeg
-                    for df in csv_list:
-                        # Un'immagine appartiene ad un solo csv
-                        res = df.query(f"filename == '{os.path.basename(file_path)}'")
-                        if not res.empty:
-                            break
+                                counter += 1
+                                pbar.update(1)
+                                if verbose:
+                                    print(f"Salvato: {output_folder / new_filename}")
 
-                    # CROP delle immagini
-                    if not res.empty:
-                        # Itera su tutte le righe trovate per quella specifica immagine
-                        for index, row in res.iterrows():
-                            # Estrai i valori direttamente del bounding box
-                            xmin = int(row["xmin"])
-                            ymin = int(row["ymin"])
-                            xmax = int(row["xmax"])
-                            ymax = int(row["ymax"])
+                    remaining.discard(base_filename)
 
-                            # Leggi l'immagine
-                            with archive.open(file_path) as img_file:
-                                img_data = io.BytesIO(img_file.read())
-                                base_name = os.path.splitext(os.path.basename(file_path))[0]
-                                base_name= base_name[:50]
+    print(f"Salvate {counter} immagini!")
 
-                                with Image.open(img_data) as img:
-                                    # Taglia l'immagine
-                                    cropped_img = img.crop((xmin, ymin, xmax, ymax))
-                                    # Salva l'immagine
-                                    new_filename = f"{base_name}cropped{index}.png"
-                                    save_path = os.path.join(output_folder, new_filename)
-                                    cropped_img.save(save_path)
-                                    print(f"Salvato: {save_path}")
-                                    counter += 1
-
-    if counter < 5000 :
-        print(f"Salvate {counter} immagini! ")
-    elif 5000 <= counter < 10000:
-        print(f"Salvate {counter} immagini! ")
+    missing = sorted(remaining)
+    if missing:
+        print(
+            f"⚠️ {len(missing)} filename presenti nel csv ma non trovati in nessuno "
+            f"dei {len(zip_paths)} zip:"
+        )
+        for name in missing[:20]:
+            print(f"  - {name}")
+        if len(missing) > 20:
+            print(f"  ... e altri {len(missing) - 20}")
     else:
-        print(f"Salvate {counter} immagini! ")
+        print("✅ Tutti i filename del csv sono stati trovati negli zip.")
+
+    return missing
+
 
 def find_csv_files() -> None:
     """
@@ -282,13 +296,13 @@ def find_csv_files() -> None:
         caricandolo tramite pandas.
 
         Returns:
-            None: Come effetto collaterale vengono aggiunti nella lista globale csv_list i
+            None: Come effetto collaterale vengono aggiunti nella lista globale csv_list_df i
             DataFrame contenente i dati letti dal file CSV.
     """
 
     # Recupera il percorso della cartella Dataset e trasformalo in assoluto (con '.resolve')
     dataset_path = u.get_dataset_dir().resolve()
-    global csv_list
+    global csv_list_df
 
     # Usa .glob(".zip") per ciclare solo sui file con estensione .zip
     for zip_path in dataset_path.glob("*.zip"):
@@ -307,16 +321,16 @@ def find_csv_files() -> None:
                     root, ext = os.path.splitext(file_path)
                     if ext == ".csv" and "train" in root:
                         df = pd.read_csv(archive.open(file_path))
-                        csv_list.append(df)
+                        csv_list_df.append(df)
                         break
 
 
 def merge_csv_files(output_csv="merged.csv", exec_find_csv_files = False) -> pd.DataFrame:
     """
-        Concatena tutti i DataFrame presenti nella lista globale 'csv_list' in un unico DataFrame
+        Concatena tutti i DataFrame presenti nella lista globale 'csv_list_df' in un unico DataFrame
         e lo salva come file CSV all'interno della cartella Dataset.
 
-        Se la lista globale `csv_list` è vuota, permette di scegliere se interrompere
+        Se la lista globale `csv_list_df` è vuota, permette di scegliere se interrompere
         l'operazione o tentare di recuperare i file automaticamente.
 
         Args:
@@ -329,10 +343,10 @@ def merge_csv_files(output_csv="merged.csv", exec_find_csv_files = False) -> pd.
             pd.DataFrame: Il nuovo DataFrame combinato.
             Restituisce `None` se la lista globale è vuota e `exec_find_csv_files` è False.
         """
-    global csv_list
+    global csv_list_df
 
     # Controlla se la lista è vuota
-    if not csv_list:
+    if not csv_list_df:
         print("Warning: nessun file .csv letto.")
         if exec_find_csv_files:
             print("Lettura dei file .csv in corso...")
@@ -343,7 +357,7 @@ def merge_csv_files(output_csv="merged.csv", exec_find_csv_files = False) -> pd.
 
     merged_csv = u.get_dataset_dir() / output_csv
     # Concatena tutti i DataFrames nella lista
-    merged_df = pd.concat(csv_list, ignore_index=True)
+    merged_df = pd.concat(csv_list_df, ignore_index=True)
     merged_df = merge_label(merged_df)
     # Crea il file .csv nella cartella Dataset
     merged_df.to_csv(merged_csv, index=False)
@@ -491,7 +505,7 @@ def delete_entries_flexible(file_csv: str, colonna: str, valore: str, n_da_elimi
 # Test
 # ==========================================
 if __name__ == "__main__":
-    m=merge_csv_files("merged.csv", True)
+    m = merge_csv_files("merged.csv", True)
     filter_and_replace_csv("trafficlight",m)
     delete_entries_flexible("merged.csv", colonna="class", valore="speedlimit", n_da_eliminare= 500)
     delete_entries_flexible("merged.csv", colonna="class", valore="green_traffic_light", n_da_eliminare= 1100)
@@ -499,4 +513,7 @@ if __name__ == "__main__":
     delete_entries_flexible("merged.csv", colonna="class", valore="do_not_turn", n_da_eliminare=600)
     delete_entries_flexible("merged.csv", colonna="class", valore="slope", n_da_eliminare=600)
 
+    print("Filename unici:", m["filename"].nunique())
+    print("Righe totali (bounding box):", len(m))
 
+    image_preprocessing_csv(m)
