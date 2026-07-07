@@ -503,7 +503,7 @@ def delete_entries_flexible(df: pd.DataFrame, colonna: str, valore: str, n_da_el
 if __name__ == "__main__":
     m = merge_csv_files("merged.csv", True)
 
-    # 2. Filtra e aggiorna 'm' in memoria in ogni passaggio
+    # aggiorna 'm' in memoria in ogni passaggio
     m = filter_and_replace_csv("trafficlight", m)
 
     m = delete_entries_flexible(m, colonna="class", valore="speedlimit", n_da_eliminare=500)
@@ -512,9 +512,8 @@ if __name__ == "__main__":
     m = delete_entries_flexible(m, colonna="class", valore="do_not_turn", n_da_eliminare=600)
     m = delete_entries_flexible(m, colonna="class", valore="slope", n_da_eliminare=600)
 
-    # Controlli di verifica direttamente su 'm'
     print("Filename unici:", m["filename"].nunique())
     print("Righe totali (bounding box):", len(m))
 
-    # 3. Passa lo stesso identico 'm' aggiornato al preprocessing delle immagini
+    #  Passa lo stesso 'm' aggiornato al preprocessing delle immagini
     image_preprocessing_csv(m)
