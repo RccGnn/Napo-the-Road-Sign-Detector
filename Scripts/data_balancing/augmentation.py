@@ -245,6 +245,7 @@ def augment_images(
 if __name__ == "__main__":
 
     dict = {
-        "speedlimit":200
+        "speedlimit":200,
+        "green_traffic_light":100
     }
     augment_images(select_classes=dict)
