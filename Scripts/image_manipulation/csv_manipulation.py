@@ -163,6 +163,7 @@ def xml_to_csv(archive: zipfile.ZipFile, output_csv="annotations.csv") -> None:
 def image_preprocessing_csv(
         merged_df: pd.DataFrame,
         output_folder: str = "preprocessed_images",
+        new_csv_file: str = "preprocessed_images.csv",
         delete_previous: bool = False,
         max_iter: int = -1,
         verbose: bool = False,
@@ -177,7 +178,8 @@ def image_preprocessing_csv(
             es. 'x'/'y'/'width'/'height'). Solo le immagini presenti qui vengono processate.
             Più righe con lo stesso filename indicano più bounding box (oggetti diversi)
             nella stessa immagine sorgente.
-        output_folder: Cartella di destinazione dentro Dataset. Default "preprocessed_images".
+        output_folder: Nome della cartella di destinazione dentro Dataset. Default "preprocessed_images".
+        new_csv_file: Nome del file csv contenente come entrate le immagini croppate e le loro classi.
         delete_previous: Se True, elimina output_folder (se esiste) prima di ricrearla.
         max_iter: Numero massimo di crop da salvare in totale (utile per test rapidi).
             Se negativo, processa tutto. Default -1.
@@ -190,7 +192,9 @@ def image_preprocessing_csv(
     Returns:
         List[str]: lista (ordinata) dei filename presenti in `merged_df` ma MAI trovati
         in nessuno dei tre zip. Lista vuota se tutti i filename del csv sono stati trovati.
-        Side-effect: crea `output_folder` piena di immagini ritagliate.
+        Side-effect:
+            - Crea `output_folder` piena di immagini ritagliate.
+            - Crea un filr
     """
     initial_len = len(merged_df)
     merged_df = merged_df.drop_duplicates()
@@ -201,6 +205,7 @@ def image_preprocessing_csv(
 
     dataset_path = u.get_dataset_dir().resolve()
     output_folder = u.get_dataset_dir() / output_folder
+    new_csv_file = dataset_path / new_csv_file
 
     if output_folder.exists() and delete_previous:
         shutil.rmtree(output_folder)
@@ -216,7 +221,8 @@ def image_preprocessing_csv(
     remaining = set(grouped.groups.keys())
 
     total_target = len(merged_df) if max_iter < 0 else min(max_iter, len(merged_df))
-    counter = 0
+    counter = 0 # Contatore numero di immagini
+    name_class_entries = [] # Lista per le entries del nuovo file csv
 
     zip_paths = sorted(dataset_path.glob("*.zip"))  # ordine deterministico
 
@@ -265,6 +271,12 @@ def image_preprocessing_csv(
                                 new_filename = f"{base_name}cropped{row.Index}.png"
                                 cropped_img.save(output_folder / new_filename)
 
+                                # Aggiungi entrata alla lista
+                                name_class_entries.append({
+                                    "nome": new_filename,
+                                    "classe": rows.loc[row.Index, "class"],
+                                })
+
                                 counter += 1
                                 pbar.update(1)
                                 if verbose:
@@ -286,6 +298,10 @@ def image_preprocessing_csv(
             print(f"  ... e altri {len(missing) - 20}")
     else:
         print("✅ Tutti i filename del csv sono stati trovati negli zip.")
+
+    # Crezione del csv
+    pd.DataFrame(name_class_entries).to_csv(new_csv_file, index=True)
+    print(f"📄 Creato '{new_csv_file}' con {len(name_class_entries)} righe (nome, classe).")
 
     return missing
 
@@ -517,3 +533,9 @@ if __name__ == "__main__":
 
     #  Passa lo stesso 'm' aggiornato al preprocessing delle immagini
     image_preprocessing_csv(m)
+
+    print("\n")
+    # Ordina le immagini in cartelle per classe
+    img = u.get_dataset_dir() / "preprocessed_images"
+    csv = u.get_dataset_dir() / "preprocessed_images.csv"
+    u.organize_images_by_class(img, csv, "nome", "classe")

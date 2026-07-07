@@ -1,9 +1,14 @@
 import os
 import pathlib
+import random
 import shutil
+import sys
 import zipfile
 import pandas as pd
+from tqdm import tqdm
 
+# Colori della barra di progresso
+colori = ["green", "red", "blue", "yellow", "cyan", "magenta", "white", "black"]
 
 def get_dataset_dir() -> pathlib.Path:
     """
@@ -125,42 +130,25 @@ def organize_images_by_class(images_dir, csv_path, filename_column, class_column
 
     print(f"Create {len(class_names)} cartelle (per classe) nella cartella {images_dir}")
 
-    all_files = [f for f in images_dir.iterdir() if f.is_file()]
+    moved, errors = 0, 0
 
-    moved, missing, errors = 0, 0, 0
+    total_target = len(df) # Numero di righe di csv da processare
+    with tqdm(total=total_target, desc="Spostamento immagini", colour="green", unit="img", file=sys.stdout) as pbar:
+        # Per ogni riga del csv...
+        for ignore, row in df.iterrows(): # ignore viene usato come buffer per il primo parametro di iterrows, che non server
+            filename = str(row[filename_column])
+            class_name = str(row[class_column])
 
-    # Per ogni riga del csv...
-    for ignore, row in df.iterrows(): # ignore viene usato come buffer per il primo parametro di iterrows, che non server
-        filename = str(row[filename_column])
-        class_name = str(row[class_column])
-
-        # Nome senza estensione, es. "road0.png" -> "road0"
-        radice = pathlib.Path(filename).stem
-        # Stesse operazioni fatte quando i file vengono salvati per la prima volta nella cartella dal csv
-        if "cropped" in radice:
-            radice = radice.split("cropped")[0]
-        radice = radice[:50]
-
-        # Trova tutti i file che iniziano con la stessa desinenza, indipendentemente dall'estensione
-        matches = [f for f in all_files if f.name.startswith(radice)]
-
-        if not matches:
-            print(f"Warning: nessun file trovato per '{filename}' (radice='{radice}')")
-            missing += 1
-            continue
-
-        for src in matches:
-            dst = images_dir / class_name / src.name  # usa il nome REALE del file trovato
+            src = images_dir / filename
+            dst = images_dir / class_name
             try:
                 shutil.move(str(src), str(dst))
                 moved += 1
             except Exception as e:
-                print(f"Error: file spostato {src} -> {dst}: {e}")
                 errors += 1
 
-    print(f"\n Spostati: {moved} file | Mancanti: {missing} file | Errori: {errors}")
+            # Aggiorna la barra di stato
+            pbar.colour = random.choice(colori)
+            pbar.update(1)
 
-if __name__ == "__main__":
-    img = get_dataset_dir() / "preprocessed_images"
-    csv = get_dataset_dir() / "merged.csv"
-    organize_images_by_class(img, csv, "filename", "class")
+    print(f"\n Spostati: {moved} file | Errori: {errors}")
