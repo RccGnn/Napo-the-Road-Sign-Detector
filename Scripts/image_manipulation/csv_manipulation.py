@@ -398,10 +398,9 @@ def filter_and_replace_csv(csv_label_class, df: pd.DataFrame) -> pd.DataFrame:
     df_filtrato = df[df['class'] != csv_label_class]
     print(df_filtrato.head())
     print("dopo filtro")
-    add_entries(df_filtrato,"merged.csv" ,"entries.txt")
+    df_aggiornato = add_entries(df_filtrato, "merged.csv", "entries.txt")
 
-
-    return df_filtrato
+    return df_aggiornato
 
 
 def add_entries(df:pd.DataFrame,file_csv:str,file_entries:str) -> pd.DataFrame:
@@ -447,7 +446,7 @@ def add_entries(df:pd.DataFrame,file_csv:str,file_entries:str) -> pd.DataFrame:
     return df
 
 
-def delete_entries_flexible(file_csv: str, colonna: str, valore: str, n_da_eliminare: int = None) -> pd.DataFrame:
+def delete_entries_flexible(df: pd.DataFrame, colonna: str, valore: str, n_da_eliminare: int = None, file_csv: str = "merged.csv") -> pd.DataFrame:
     """
     Elimina le righe che corrispondono a un determinato valore in una colonna scelta.
 
@@ -460,28 +459,26 @@ def delete_entries_flexible(file_csv: str, colonna: str, valore: str, n_da_elimi
         valore: Il valore da cercare (es. "obligation", 400).
         n_da_eliminare: (Opzionale) Quante righe cancellare a caso. Di default è None (elimina tutto).
     """
-    # 1. Carica il file CSV
+    # 1. Gestione del percorso di salvataggio su disco
     file_csv_path = pathlib.Path(file_csv)
     if not file_csv_path.is_absolute():
         file_csv_path = u.get_dataset_dir() / file_csv
 
-    if not file_csv_path.exists():
-        raise FileNotFoundError(f"File non trovato: {file_csv_path}")
-
-    df = pd.read_csv(file_csv_path)
+    # Creiamo una copia di lavoro per sicurezza
+    df_lavoro = df.copy()
 
     # 2. Trova gli indici di tutte le righe corrispondenti
-    indici_corrispondenti = df[df[colonna].astype(str).str.strip() == str(valore).strip()].index
+    indici_corrispondenti = df_lavoro[df_lavoro[colonna].astype(str).str.strip() == str(valore).strip()].index
     totale_trovati = len(indici_corrispondenti)
 
     if totale_trovati == 0:
         print(f"Nessuna riga trovata con {colonna} = '{valore}'.")
-        return df
+        return df_lavoro
 
     # 3. LOGICA DI ELIMINAZIONE
     if n_da_eliminare is None:
-        # CASO 1: Elimina TUTTE le righe che corrispondono alla ricerca
-        df_aggiornato = df.drop(index=indici_corrispondenti).reset_index(drop=True)
+        # CASO 1: Elimina TUTTE le righe
+        df_aggiornato = df_lavoro.drop(index=indici_corrispondenti).reset_index(drop=True)
         print(f"Target '{colonna}' = '{valore}': Eliminate TUTTE le {totale_trovati} righe trovate.")
     else:
         # CASO 2: Elimina solo un TOT di righe in modo RANDOM
@@ -492,28 +489,32 @@ def delete_entries_flexible(file_csv: str, colonna: str, valore: str, n_da_elimi
             random_state=None
         ).values
 
-        df_aggiornato = df.drop(index=indici_da_eliminare).reset_index(drop=True)
+        df_aggiornato = df_lavoro.drop(index=indici_da_eliminare).reset_index(drop=True)
         print(
             f"Target '{colonna}' = '{valore}': Trovate {totale_trovati} righe. Cancellate {quantita_effettiva} a caso! ")
 
-    # 4. Salva il file CSV aggiornato
+    # 4. Salva il file CSV aggiornato su disco e restituisce il DataFrame modificato
     df_aggiornato.to_csv(file_csv_path, index=False)
     return df_aggiornato
-
 
 # ==========================================
 # Test
 # ==========================================
 if __name__ == "__main__":
     m = merge_csv_files("merged.csv", True)
-    filter_and_replace_csv("trafficlight",m)
-    delete_entries_flexible("merged.csv", colonna="class", valore="speedlimit", n_da_eliminare= 500)
-    delete_entries_flexible("merged.csv", colonna="class", valore="green_traffic_light", n_da_eliminare= 1100)
-    delete_entries_flexible("merged.csv", colonna="class", valore="obligation", n_da_eliminare=500)
-    delete_entries_flexible("merged.csv", colonna="class", valore="do_not_turn", n_da_eliminare=600)
-    delete_entries_flexible("merged.csv", colonna="class", valore="slope", n_da_eliminare=600)
 
+    # 2. Filtra e aggiorna 'm' in memoria in ogni passaggio
+    m = filter_and_replace_csv("trafficlight", m)
+
+    m = delete_entries_flexible(m, colonna="class", valore="speedlimit", n_da_eliminare=500)
+    m = delete_entries_flexible(m, colonna="class", valore="green_traffic_light", n_da_eliminare=1100)
+    m = delete_entries_flexible(m, colonna="class", valore="obligation", n_da_eliminare=500)
+    m = delete_entries_flexible(m, colonna="class", valore="do_not_turn", n_da_eliminare=600)
+    m = delete_entries_flexible(m, colonna="class", valore="slope", n_da_eliminare=600)
+
+    # Controlli di verifica direttamente su 'm'
     print("Filename unici:", m["filename"].nunique())
     print("Righe totali (bounding box):", len(m))
 
+    # 3. Passa lo stesso identico 'm' aggiornato al preprocessing delle immagini
     image_preprocessing_csv(m)
