@@ -260,15 +260,17 @@ def image_preprocessing_csv(
                     with archive.open(file_path) as img_file:
                         img_data = io.BytesIO(img_file.read())
                         with Image.open(img_data) as img:
-                            # itertuples è molto più veloce di iterrows: niente
-                            # creazione di una Series per ogni riga/bounding box.
+
+                            duplicate = 0
+                            # creazione di una Series per ogni riga/bounding box (itera per ogni bounding box)
                             for row in rows.itertuples(index=True):
                                 if 0 <= max_iter <= counter:
                                     break
                                 xmin, ymin = int(row.xmin), int(row.ymin)
                                 xmax, ymax = int(row.xmax), int(row.ymax)
                                 cropped_img = img.crop((xmin, ymin, xmax, ymax))
-                                new_filename = f"{base_name}cropped{row.Index}.png"
+                                new_filename = f"{base_name}_cropped_{duplicate}.png"
+                                duplicate += 1
                                 cropped_img.save(output_folder / new_filename)
 
                                 # Aggiungi entrata alla lista
@@ -300,7 +302,7 @@ def image_preprocessing_csv(
         print("✅ Tutti i filename del csv sono stati trovati negli zip.")
 
     # Crezione del csv
-    pd.DataFrame(name_class_entries).to_csv(new_csv_file, index=True)
+    pd.DataFrame(name_class_entries).to_csv(new_csv_file, index=False)
     print(f"📄 Creato '{new_csv_file}' con {len(name_class_entries)} righe (nome, classe).")
 
     return missing
