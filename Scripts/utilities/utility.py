@@ -145,6 +145,7 @@ def organize_images_by_class(images_dir, csv_path, filename_column, class_column
                 shutil.move(str(src), str(dst))
                 moved += 1
             except Exception as e:
+                print(f"Errore: {src} - {e}")
                 errors += 1
 
             # Aggiorna la barra di stato

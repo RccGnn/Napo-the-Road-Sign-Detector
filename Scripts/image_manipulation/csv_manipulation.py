@@ -255,7 +255,7 @@ def image_preprocessing_csv(
                         continue
 
                     rows = grouped.get_group(base_filename)
-                    base_name = os.path.splitext(base_filename)[0][:50]
+                    base_name = os.path.splitext(base_filename)[0][:128]
 
                     with archive.open(file_path) as img_file:
                         img_data = io.BytesIO(img_file.read())
