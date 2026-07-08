@@ -255,7 +255,11 @@ def image_preprocessing_csv(
                         continue
 
                     rows = grouped.get_group(base_filename)
-                    base_name = os.path.splitext(base_filename)[0][:128]
+                    # 1. Separa il nome del file base dal path (e lo restituisce come primo elemento '0')
+                    # 2. Tronca il nome del file ai primi 100 caratteri
+                    # 3. Hash-ing del resto del nome (hasha tutto il nome e maschera tutto tranne gli ultimi 16 bit)
+                    # 4. Concatena l'hash ottenuto (convertito in decimale ':x') al nome troncato
+                    base_name = os.path.splitext(base_filename)[0][:100] + f"_{hash(base_filename) & 0xffff:x}"
 
                     with archive.open(file_path) as img_file:
                         img_data = io.BytesIO(img_file.read())
