@@ -1,11 +1,11 @@
 from PIL import Image
 from predictor import predict
 
-image = Image.open("segnale.jpg")
+image = Image.open("images_examples/segnale2.jpg")
 
 results, inference_time = predict(
     image,
-    "ConvNeXt"
+    "EfficientNet"
 )
 
 for classe, prob in results:

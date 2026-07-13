@@ -2,14 +2,14 @@ import torch
 import torch.nn as nn
 import time
 from torchvision import models, transforms, datasets
-from pathlib import Path
+from Scripts.utilities import utility as u
 
 # ---
 # Percorsi
 # ---
-BASE_DIR = Path(__file__).resolve().parent.parent
-TRAIN_DIR = BASE_DIR / "Dataset" / "Dataset_split" / "train"
-MODELS_DIR = BASE_DIR / "Dataset"
+BASE_DIR = u.get_dataset_dir()
+TRAIN_DIR = BASE_DIR /  "Dataset_split" / "train"
+MODELS_DIR = BASE_DIR
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # ---
