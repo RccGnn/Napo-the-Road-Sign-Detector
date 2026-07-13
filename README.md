@@ -6,7 +6,7 @@ Repository per il progetto del corso di Fondamenti di Intelligenza Artificiale, 
 
 This project — Napo the Road Sign Detector — was trained using image data sourced from
 Roboflow Universe, an open repository of computer vision
-datasets hosted by Roboflow. The datasets below are credited in
+datasets hosted by Roboflow and Kaggle. The datasets below are credited in
 accordance with their respective licenses.
 
 
