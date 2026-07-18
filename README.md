@@ -6,7 +6,7 @@ Repository per il progetto del corso di Fondamenti di Intelligenza Artificiale, 
 
 This project — Napo the Road Sign Detector — was trained using image data sourced from
 Roboflow Universe, an open repository of computer vision
-datasets hosted by Roboflow. The datasets below are credited in
+datasets hosted by Roboflow and Kaggle. The datasets below are credited in
 accordance with their respective licenses.
 
 
@@ -21,17 +21,8 @@ accordance with their respective licenses.
 
 
 
-## 2. Traffic Signs Computer Vision Model (v15) — by trafficqro
 
-
-**Source**: Roboflow Universe — traffic-signs [(Roboflow Dataset Page)](https://universe.roboflow.com/trafficqro/traffic-signs-xjiby)
-
-**Author**: trafficqro [(Roboflow Author Page)](https://universe.roboflow.com/trafficqro)
-
-**License**: Public Domain (no attribution legally required; credited here for transparency)
-
-
-## 3. Road Sign Computer Vision Model (v3) — by Big Diggers
+## 2. Road Sign Computer Vision Model (v3) — by Big Diggers
 
 
 **Source**: Roboflow Universe — road-sign [(Roboflow Dataset Page)](https://universe.roboflow.com/big-diggers/road-sign-mcfu1)
@@ -41,7 +32,7 @@ accordance with their respective licenses.
 **License**: CC BY 4.0
 
 
-## 4. Road Sign Detection - by Larxel
+## 3. Road Sign Detection - by Larxel
 
 
 **Source**: Kaggle - road-sign-detection [(Kaggle Dataset Page)](https://www.kaggle.com/datasets/andrewmvd/road-sign-detection) 
