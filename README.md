@@ -38,7 +38,7 @@ Di seguito sono riportati i passaggi necessari per replicare i risultati ottenut
 
 A questo punto:
 * Per eseguire l'applicazione:\
-muovendosi nella cartella Application, eseguire da shell il comando 
+muovendosi nella cartella Application, eseguire da shell il comando `streamlit run app.py` 
 
 * Per visualizzare le metriche sul dataset reale:\
 eseguire lo script Dataset/RealDatasetTest.py
