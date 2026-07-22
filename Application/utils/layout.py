@@ -1,9 +1,6 @@
 import streamlit as st
 
-
-# ==============================
 # Funzione per centrare elementi
-# ==============================
 def centered_container():
 
     return st.columns(

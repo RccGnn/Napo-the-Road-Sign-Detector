@@ -2,26 +2,20 @@ import torch
 import torch.nn as nn
 import time
 from torchvision import models, transforms, datasets
-from Scripts.utilities import utility as u
+from pathlib import Path
 
-# ---
 # Percorsi
-# ---
-BASE_DIR = u.get_dataset_dir()
-TRAIN_DIR = BASE_DIR /  "Dataset_split" / "train"
-MODELS_DIR = BASE_DIR
+BASE_DIR = Path(__file__).resolve().parent.parent
+TRAIN_DIR = BASE_DIR / "Dataset" / "Dataset_split" / "train"
+MODELS_DIR = BASE_DIR / "Dataset"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# ---
 # Classi
-# ---
 train_dataset = datasets.ImageFolder(TRAIN_DIR)
 class_names = train_dataset.classes
 NUM_CLASSES = len(class_names)
 
-# ---
-# Configurazione modelli
-# ---
+# Ricerca modelli
 MODEL_CONFIG = {
     "EfficientNet": {
         "path": MODELS_DIR / "efficientnetv2_finetuned.pth",
@@ -34,11 +28,10 @@ MODEL_CONFIG = {
     }
 }
 
-# ---
 # Caricamento modello
-# ---
 _loaded_models = {}
 
+"""---"""
 
 def load_model(model_name):
 
@@ -46,24 +39,18 @@ def load_model(model_name):
         return _loaded_models[model_name]
 
     if model_name == "EfficientNet":
-
         model = models.efficientnet_v2_m(weights=None)
-
         in_features = model.classifier[1].in_features
-
         model.classifier[1] = nn.Linear(
             in_features,
             NUM_CLASSES
         )
 
     elif model_name == "ConvNeXt":
-
         model = models.convnext_base(
             weights=models.ConvNeXt_Base_Weights.IMAGENET1K_V1
         )
-
         in_features = model.classifier[2].in_features
-
         model.classifier[2] = nn.Linear(
             in_features,
             NUM_CLASSES
@@ -85,11 +72,9 @@ def load_model(model_name):
 
     return model
 
+"""---"""
 
-# --------------------------------------------------
-# Trasformazioni
-# --------------------------------------------------
-
+# Trasformazioni immagine
 def get_transform(model_name):
 
     img_size = MODEL_CONFIG[model_name]["img_size"]
@@ -103,11 +88,9 @@ def get_transform(model_name):
         )
     ])
 
+"""---"""
 
-# --------------------------------------------------
-# Predizione
-# --------------------------------------------------
-
+# Predizione con i nostri modelli
 def predict(image, model_name):
 
     model = load_model(model_name)
@@ -122,28 +105,23 @@ def predict(image, model_name):
 
     start_time = time.perf_counter()
 
-
     with torch.no_grad():
         output = model(image)
         probabilities = torch.softmax(output, dim=1)
-
 
     if torch.cuda.is_available():
         torch.cuda.synchronize()
 
     inference_time = time.perf_counter() - start_time
 
-
     top3_prob, top3_idx = torch.topk(
         probabilities,
         3
     )
 
-
     results = []
 
     for p, idx in zip(top3_prob[0], top3_idx[0]):
-
         results.append(
             (
                 class_names[idx.item()],

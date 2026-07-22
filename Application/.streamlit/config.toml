@@ -1,4 +1,6 @@
+
 [global]
+# Utilizzata per rendere i widget di Streamlit in italiano
 locale = "it"
 
 #[theme]

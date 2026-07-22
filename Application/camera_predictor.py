@@ -14,9 +14,9 @@ from streamlit_webrtc import (
 )
 
 from PIL import Image
-
 from predictor import predict
 
+"""---"""
 
 class SignDetector(VideoProcessorBase):
 

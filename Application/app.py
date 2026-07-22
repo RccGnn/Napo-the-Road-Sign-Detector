@@ -25,8 +25,8 @@ from utils.layout import (
 )
 
 # Per runnare l'applicazione:
-# cd Application
-# streamlit run app.py
+# 1) Posizionarsi nella cartella (scegliere un percorso breve per testare il progetto): cd Application
+# 2) streamlit run app.py
 
 # Configurazione del tab
 st.set_page_config(
@@ -44,12 +44,11 @@ show_history()
 
 input_mode, image = select_input()
 
-# ------------------------------
-# Telecamera live
-# ------------------------------
+"""---"""
+
+# Telecamera live. La scelta di non utilizzare un package differente per la telecamera live è stata determinata da vincoli di software.
 
 if input_mode == "Telecamera live":
-
     st_autorefresh(
         interval=3000,
         key="live_history_refresh"
@@ -60,19 +59,15 @@ if input_mode == "Telecamera live":
     )
 
     with col_video:
-
         st.subheader(
             "🚗 Riconoscimento in tempo reale"
         )
-
         run_camera(selected_model)
 
     with col_history:
-
         st.subheader(
             "📜 Lista in diretta"
         )
-
         while not history_queue.empty():
             item = history_queue.get()
 
@@ -87,11 +82,9 @@ if input_mode == "Telecamera live":
         ]
 
         if len(live_history) > 0:
-
             live_df = pd.DataFrame(
                 live_history[:10]
             )
-
             st.dataframe(
                 live_df,
                 hide_index=True,
@@ -99,15 +92,11 @@ if input_mode == "Telecamera live":
             )
 
         else:
-
             st.info(
                 "In attesa di segnali dalla telecamera live..."
             )
 
-# ==============================
 # Predizione
-# ==============================
-
 elif image is not None:
 
     show_result(
