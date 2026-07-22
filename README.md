@@ -18,15 +18,16 @@ Il progetto Napo si pone due obiettivi principali:
 
 # Dipendenze / Dependencies
 Il progetto richiede Python 3.12 ed i seguenti moduli:
-pandas
-pillow
-numpy
-tqdm
-matplotlib
-torch
-torchvision
-scikit-learn
-streamlit
+pandas\
+pillow\
+numpy\
+tqdm\
+matplotlib\
+torch\
+torchvision\
+scikit-learn\
+streamlit\
+seaborn
 
 # Istruzioni per la riproduzione / Imitations steps
 Di seguito sono riportati i passaggi necessari per replicare i risultati ottenuti dal progetto:
