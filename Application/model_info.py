@@ -35,10 +35,10 @@ def get_parameters(model_name):
         )
 
     elif model_name == "ConvNeXt":
-
         model = models.convnext_base(
             weights=None
         )
+
     else:
         return None
 
@@ -52,5 +52,4 @@ def get_parameters(model_name):
 """---"""
 
 def get_accuracy(model_name):
-
     return MODEL_INFO[model_name]["accuracy"]

@@ -29,10 +29,7 @@ from utils.layout import (
 # 2) streamlit run app.py
 
 # Configurazione del tab
-st.set_page_config(
-    page_title="Road Sign Detector",
-    page_icon="🚦"
-)
+st.set_page_config(page_title="Road Sign Detector", page_icon="🚦")
 
 initialize_history()
 
@@ -47,34 +44,21 @@ input_mode, image = select_input()
 """---"""
 
 # Telecamera live. La scelta di non utilizzare un package differente per la telecamera live è stata determinata da vincoli di software.
-
 if input_mode == "Telecamera live":
-    st_autorefresh(
-        interval=3000,
-        key="live_history_refresh"
-    )
+    st_autorefresh(interval=3000, key="live_history_refresh")
 
-    col_video, col_history = st.columns(
-        [2, 1]
-    )
+    col_video, col_history = st.columns([2, 1])
 
     with col_video:
-        st.subheader(
-            "🚗 Riconoscimento in tempo reale"
-        )
+        st.subheader("🚗 Riconoscimento in tempo reale")
         run_camera(selected_model)
 
     with col_history:
-        st.subheader(
-            "📜 Lista in diretta"
-        )
+        st.subheader("📜 Lista in diretta")
         while not history_queue.empty():
             item = history_queue.get()
 
-            st.session_state.history.insert(
-                0,
-                item
-            )
+            st.session_state.history.insert(0, item)
 
         live_history = [
             item for item in st.session_state.history
@@ -85,22 +69,11 @@ if input_mode == "Telecamera live":
             live_df = pd.DataFrame(
                 live_history[:10]
             )
-            st.dataframe(
-                live_df,
-                hide_index=True,
-                use_container_width=True
-            )
+            st.dataframe(live_df, hide_index=True, use_container_width=True)
 
         else:
-            st.info(
-                "In attesa di segnali dalla telecamera live..."
-            )
+            st.info("In attesa di segnali dalla telecamera live...")
 
 # Predizione
 elif image is not None:
-
-    show_result(
-        image,
-        selected_model,
-        input_mode
-    )
+    show_result(image, selected_model, input_mode)

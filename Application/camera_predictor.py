@@ -21,7 +21,6 @@ from predictor import predict
 class SignDetector(VideoProcessorBase):
 
     def __init__(self, model_name):
-
         self.model_name = model_name
         self.counter = 0
         self.result = "Analisi..."
@@ -32,11 +31,8 @@ class SignDetector(VideoProcessorBase):
         self.last_signal = None
         self.last_time = datetime.now()
 
-
     def run_prediction(self, image):
-
         try:
-
             results, _ = predict(
                 image,
                 self.model_name
@@ -47,9 +43,7 @@ class SignDetector(VideoProcessorBase):
 
             now = datetime.now()
 
-            # Salva solo se cambia segnale
-            # oppure se sono passati 5 secondi
-
+            # Salva solo se cambia segnale oppure se sono passati 5 secondi.
             if (
                     signal != self.last_signal
                     or
@@ -72,23 +66,12 @@ class SignDetector(VideoProcessorBase):
                 self.last_signal = signal
                 self.last_time = now
 
-            text = (
-                results[0][0]
-                +
-                " "
-                +
-                str(round(results[0][1], 2))
-                +
-                "%"
-            )
-
+            text = (results[0][0] +" " + str(round(results[0][1], 2)) + "%")
 
             with self.lock:
                 self.result = text
 
-
         except Exception as e:
-
             with self.lock:
                 self.result = str(e)
 
@@ -102,11 +85,9 @@ class SignDetector(VideoProcessorBase):
             format="bgr24"
         )
 
-
         self.counter += 1
 
-
-        # Una predizione ogni 30 frame
+        # Una predizione ogni 60 frame
         if self.counter % 60 == 0:
 
             if self.prediction_lock.acquire(blocking=False):
@@ -126,29 +107,14 @@ class SignDetector(VideoProcessorBase):
 
                 thread.start()
 
-
-
         with self.lock:
-
             text = self.result
 
+        cv2.putText(img, text, (30,50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
 
-        cv2.putText(
-            img,
-            text,
-            (30,50),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            1,
-            (0,255,0),
-            2
-        )
+        return av.VideoFrame.from_ndarray(img, format="bgr24")
 
-
-        return av.VideoFrame.from_ndarray(
-            img,
-            format="bgr24"
-        )
-
+"""---"""
 
 def run_camera(model_name):
 
