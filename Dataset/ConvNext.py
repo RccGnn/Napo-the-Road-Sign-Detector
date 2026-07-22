@@ -10,7 +10,9 @@ from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 from torchvision.models import convnext_base, ConvNeXt_Base_Weights
 from sklearn.metrics import classification_report, confusion_matrix
-
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # --------------------------------------------------------------------------- #
 # 1. FOCAL LOSS
@@ -162,7 +164,7 @@ def train_model(model, dataloaders, criterion, optimizer, device, num_epochs, ch
 
 @torch.no_grad()
 def evaluate_on_test(model, dataloader, class_names, device):
-    print("\n[FASE 5] Inizio Valutazione sul Test Set Inedito...")
+    print("\n[FASE 5] Inizio Valutazione sul Test Set Inedito e Generazione Grafici...")
     model.eval()
     all_preds, all_labels = [], []
 
@@ -170,17 +172,60 @@ def evaluate_on_test(model, dataloader, class_names, device):
         images = images.to(device)
         outputs = model(images)
         preds = outputs.argmax(dim=1).cpu()
-        all_preds.append(preds)
-        all_labels.append(labels)
 
-    all_preds = torch.cat(all_preds).numpy()
-    all_labels = torch.cat(all_labels).numpy()
+        # Uso extend perché stiamo convertendo subito in array numpy per i grafici
+        all_preds.extend(preds.numpy())
+        all_labels.extend(labels.cpu().numpy())
 
-    print("\n=== TEST SET - Report di Classificazione ===")
+    # Stampa testuale classica in console
+    print("\n--- Classification Report ---")
     print(classification_report(all_labels, all_preds, target_names=class_names, digits=4))
 
-    print("\n=== TEST SET - Matrice di Confusione ===")
-    print(confusion_matrix(all_labels, all_preds))
+    # ==========================================
+    # 1. GRAFICO A BARRE: Precision, Recall, F1
+    # ==========================================
+    report = classification_report(all_labels, all_preds, target_names=class_names, output_dict=True)
+
+    precision = [report[c]['precision'] for c in class_names]
+    recall = [report[c]['recall'] for c in class_names]
+    f1 = [report[c]['f1-score'] for c in class_names]
+
+    x = np.arange(len(class_names))
+    width = 0.25
+
+    fig, ax = plt.subplots(figsize=(14, 6))
+    ax.bar(x - width, precision, width, label='Precision')
+    ax.bar(x, recall, width, label='Recall')
+    ax.bar(x + width, f1, width, label='F1-score')
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(class_names, rotation=45, ha='right')
+    ax.set_ylim(0, 1.05)
+    ax.set_ylabel('Score')
+    ax.set_title('Precision / Recall / F1 per classe')
+    ax.legend()
+    ax.grid(axis='y', alpha=0.3)
+    plt.tight_layout()
+    plt.savefig('classification_report.png', dpi=150)
+    print("  --> Grafico delle metriche salvato in: classification_report.png")
+    plt.show()
+
+    # ==========================================
+    # 2. MATRICE DI CONFUSIONE (Heatmap)
+    # ==========================================
+    cm = confusion_matrix(all_labels, all_preds)
+
+    plt.figure(figsize=(12, 10))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=class_names, yticklabels=class_names)
+    plt.xlabel('Predicted')
+    plt.ylabel('True')
+    plt.title('Confusion Matrix - Test Set')
+    plt.xticks(rotation=45, ha='right')
+    plt.yticks(rotation=0)
+    plt.tight_layout()
+    plt.savefig('confusion_matrix.png', dpi=150)
+    print("  --> Matrice di confusione salvata in: confusion_matrix.png")
+    plt.show()
 
 
 # --------------------------------------------------------------------------- #
